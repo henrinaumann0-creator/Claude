@@ -66,6 +66,9 @@ shell = shell.replace('<!--#DASHBOARD#-->', dashboard)
 
 fs.writeFileSync(path.join(OUT, 'index.html'), shell, 'utf8');
 
+/* GitHub Pages soll die Dateien unveraendert ausliefern (kein Jekyll) */
+fs.writeFileSync(path.join(OUT, '.nojekyll'), '', 'utf8');
+
 const files = [];
 (function walk(dir) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {

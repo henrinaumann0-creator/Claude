@@ -90,6 +90,13 @@ npm run serve:web    # baut und startet http://localhost:4173
 Die mitgelieferte `vercel.json` beschreibt den Build (`node build/build-web.js` →
 `dist-web/`), sodass jeder Push automatisch neu veröffentlicht wird.
 
+**Veröffentlicht auf GitHub Pages:**
+<https://henrinaumann0-creator.github.io/Claude/>
+
+Der Workflow `.github/workflows/web.yml` baut und veröffentlicht bei jedem Push auf
+den Standard-Branch. Damit das greift, muss Pages im Repository einmalig eingeschaltet
+sein: *Settings → Pages → Source: **GitHub Actions***.
+
 Auf dem Handy: Seite im Browser öffnen → *Zum Home-Bildschirm hinzufügen*. Danach
 startet Claude Pets wie eine normale App im Vollbild und läuft auch offline.
 
