@@ -1,0 +1,60 @@
+# Veröffentlicht die Web-Version (dist-web/) auf GitHub Pages.
+name: Web-App veröffentlichen
+
+on:
+  push:
+    branches:
+      - "claude/chatgpt-pets-app-levels-r6ygjj"
+    paths:
+      - "src/**"
+      - "web/**"
+      - "build/**"
+      - ".github/workflows/web.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  bauen:
+    name: Web-Version bauen
+    runs-on: ubuntu-latest
+    steps:
+      - name: Quelltext holen
+        uses: actions/checkout@v4
+
+      - name: Node einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Web-Version bauen
+        run: node build/build-web.js
+
+      - name: GitHub Pages vorbereiten
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Ergebnis hochladen
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist-web
+
+  veroeffentlichen:
+    name: Veröffentlichen
+    needs: bauen
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Auf GitHub Pages ausliefern
+        id: deployment
+        uses: actions/deploy-pages@v4
