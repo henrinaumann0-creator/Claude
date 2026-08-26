@@ -108,7 +108,7 @@ function pawIcon(size) {
 
 const outDir = path.join(__dirname, '..', 'src', 'assets');
 fs.mkdirSync(outDir, { recursive: true });
-for (const size of [16, 22, 32, 64, 128, 256, 512]) {
+for (const size of [16, 22, 32, 64, 128, 180, 192, 256, 512]) {
   fs.writeFileSync(path.join(outDir, `icon-${size}.png`), encodePNG(size, size, pawIcon(size)));
 }
 fs.copyFileSync(path.join(outDir, 'icon-32.png'), path.join(outDir, 'tray.png'));

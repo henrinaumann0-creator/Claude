@@ -1,0 +1,230 @@
+/* ============================================================
+   Claude Pets – Web-Anpassungen
+   Wird nach theme.css, dashboard.css und pet.css geladen und
+   überschreibt gezielt, was im Browser anders sein muss.
+   ============================================================ */
+
+html, body {
+  background: var(--c-bg);
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Eingabefelder müssen markierbar bleiben (pet.css sperrt die Auswahl) */
+input, textarea, select, .code-box {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* Grid- und Flex-Kinder dürfen unter ihre Inhaltsbreite schrumpfen,
+   sonst schiebt sich das Layout auf schmalen Geräten aus dem Bild. */
+.app, .content, .view, .hero, .hero-info, .hero-stage,
+.wardrobe, .wardrobe-panels, .wardrobe-preview, .panel,
+.cards, .card, .stats-grid, .grid, .opt,
+.road, .road-item, .road-main, .gauges, .gauge,
+.xp-row, .xp-sources, .actions, .actions .btn,
+.row-toggle, .row-slider, .danger-row, .name-row { min-width: 0; }
+
+.app { grid-template-columns: 232px minmax(0, 1fr); }
+.hero { grid-template-columns: 268px minmax(0, 1fr); }
+.wardrobe { grid-template-columns: 300px minmax(0, 1fr); }
+.gauges { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.road-item { grid-template-columns: 54px minmax(0, 1fr) auto; }
+.road-main strong, .road-main small, .card-note, .next-hint { overflow-wrap: anywhere; }
+
+/* Die Bühne des Pets liegt über der Oberfläche, lässt Klicks aber durch */
+.stage { z-index: 60; }
+.pet { z-index: 61; }
+
+/* ------------------------------------------------------------
+   Kopfzeile (nur schmale Bildschirme)
+   ------------------------------------------------------------ */
+.topbar {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: calc(52px + env(safe-area-inset-top));
+  padding: env(safe-area-inset-top) 14px 0;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(250, 249, 245, .92);
+  backdrop-filter: blur(12px) saturate(1.3);
+  border-bottom: 1px solid var(--c-line);
+  z-index: 70;
+}
+.topbar-brand {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 14.5px; font-weight: 650; letter-spacing: -.015em;
+  color: var(--c-ink);
+}
+.topbar-brand img { image-rendering: pixelated; border-radius: 6px; }
+.topbar-right { display: flex; align-items: center; gap: 8px; }
+.topbar-level {
+  padding: 4px 11px;
+  border-radius: var(--r-pill);
+  background: var(--c-orange-wash);
+  border: 1px solid var(--c-orange-light);
+  color: var(--c-orange-deep);
+  font-size: 12px; font-weight: 600;
+}
+.install-btn {
+  padding: 5px 11px;
+  border: 1px solid var(--c-orange);
+  border-radius: var(--r-pill);
+  background: var(--c-orange);
+  color: #fff;
+  font: inherit; font-size: 11.5px; font-weight: 600;
+  cursor: pointer;
+  animation: badgeBeat 2.4s var(--ease-out) infinite;
+}
+
+/* ------------------------------------------------------------
+   Schmale Bildschirme: Seitenleiste wird zur Tab-Leiste
+   ------------------------------------------------------------ */
+@media (max-width: 860px) {
+  .topbar { display: flex; }
+
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+    height: var(--vh, 100vh);
+    padding-top: calc(52px + env(safe-area-inset-top));
+  }
+
+  .sidebar {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    flex-direction: row;
+    align-items: center;
+    height: calc(64px + env(safe-area-inset-bottom));
+    padding: 5px 6px calc(5px + env(safe-area-inset-bottom));
+    gap: 0;
+    background: rgba(242, 240, 233, .95);
+    backdrop-filter: blur(12px) saturate(1.3);
+    border-right: 0;
+    border-top: 1px solid var(--c-line);
+    z-index: 70;
+  }
+  .brand, .side-card, .ghost-btn { display: none; }
+
+  .nav { flex-direction: row; width: 100%; gap: 2px; }
+  .nav-item {
+    position: relative;
+    flex: 1 1 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 7px 2px 6px;
+    border-radius: 13px;
+    font-size: 10px;
+    line-height: 1.15;
+    letter-spacing: -.01em;
+  }
+  .nav-item span:not(.nav-ico) { display: inline; }
+  .nav-item.is-active::before { display: none; }
+  .nav-item.is-active { background: var(--c-surface); box-shadow: var(--sh-1); }
+  .nav-ico { font-size: 17px; width: auto; }
+  .nav-badge {
+    position: absolute;
+    top: 3px;
+    right: calc(50% - 20px);
+    margin-left: 0;
+    min-width: 16px; height: 16px;
+    font-size: 9.5px;
+  }
+
+  .content { padding: 16px 15px 26px; }
+  .view-head { margin-bottom: 16px; gap: 12px; }
+  .view-head h1 { font-size: 21px; }
+  .sub { font-size: 12.5px; }
+
+  .hero, .wardrobe { grid-template-columns: minmax(0, 1fr); }
+  .hero { padding: 16px; gap: 16px; border-radius: var(--r-lg); margin-bottom: 16px; }
+  .hero-stage { min-height: 190px; }
+  .hero-pet { width: 130px; height: 130px; }
+  .name-input { font-size: 20px; padding: 6px 9px; }
+  .actions { gap: 8px; }
+  .actions .btn { flex: 1 1 calc(50% - 4px); justify-content: center; padding: 11px 8px; }
+
+  .cards, .stats-grid { grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 10px; }
+  .card { padding: 13px 14px; border-radius: var(--r-md); }
+  .card-value { font-size: 22px; }
+
+  .filters { gap: 5px; }
+  .chip { padding: 5px 11px; font-size: 12px; }
+
+  .road { padding-left: 22px; }
+  .road::before { left: 7px; }
+  .road-item {
+    grid-template-columns: 44px minmax(0, 1fr);
+    grid-template-areas: "art main" "side side";
+    gap: 10px 12px;
+    padding: 11px 13px;
+    border-radius: var(--r-md);
+  }
+  .road-item::before { left: -19px; width: 10px; height: 10px; margin-top: -5px; }
+  .road-art { grid-area: art; width: 44px; height: 44px; }
+  .road-art svg { width: 46px; height: 46px; }
+  .road-main { grid-area: main; }
+  .road-side {
+    grid-area: side;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding-top: 2px;
+    border-top: 1px solid var(--c-line);
+    margin-top: 2px;
+  }
+
+  .wardrobe { grid-template-columns: 1fr; gap: 14px; }
+  .wardrobe-preview { position: static; min-height: 210px; }
+  .wardrobe-preview .hero-pet { width: 150px; height: 150px; }
+  .panel { padding: 15px 16px; border-radius: var(--r-md); }
+  .grid--pets, .grid--sm { grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; }
+  .opt-art, .opt-art svg { width: 54px; height: 54px; }
+
+  .xp-row { grid-template-columns: 88px minmax(0, 1fr) 56px; gap: 9px; font-size: 12px; }
+
+  .row-toggle, .row-slider { gap: 14px; padding: 12px 0; }
+  .row-toggle strong, .row-slider strong { font-size: 13px; }
+  input[type="range"] { width: 130px; }
+  .danger-row { flex-direction: column; align-items: flex-start; gap: 12px; }
+
+  .snackbar { bottom: calc(78px + env(safe-area-inset-bottom)); font-size: 12.5px; }
+  .toast { right: 14px; bottom: calc(78px + env(safe-area-inset-bottom)); padding: 12px 16px 12px 12px; }
+  .toast-badge { width: 40px; height: 40px; font-size: 16px; }
+  .bubble { max-width: min(260px, calc(100vw - 40px)); }
+  .bubble-text { font-size: 13px; }
+  .menu { min-width: 200px; }
+  .menu-item { padding: 11px 10px; font-size: 13.5px; }
+}
+
+/* Sehr schmale Geräte */
+@media (max-width: 380px) {
+  .nav-item { font-size: 9px; }
+  .actions .btn { font-size: 12px; padding: 10px 6px; }
+}
+
+/* ------------------------------------------------------------
+   Breite Bildschirme: klassisches Dashboard-Layout
+   ------------------------------------------------------------ */
+@media (min-width: 861px) {
+  .app { height: 100vh; }
+}
+
+/* Auf Touch-Geräten Hover-Effekte zurückhalten */
+@media (pointer: coarse) {
+  .btn:hover:not(:disabled),
+  .card:hover,
+  .road-item:hover,
+  .opt:hover:not(.is-locked) { transform: none; }
+  .nav-item:hover { background: transparent; }
+  .nav-item.is-active:hover { background: var(--c-surface); }
+}
+
+/* Auf der Übersicht darf das Pet frei laufen – sonst parkt es.
+   Die Bühne bekommt dafür eine dezente Markierung. */
+body[data-view="home"] .pet-hint { display: block; }

@@ -34,6 +34,8 @@ contextBridge.exposeInMainWorld('pets', {
   setSettings: (patch) => ipcRenderer.invoke('settings:set', patch),
   markRewardsSeen: (ids) => ipcRenderer.invoke('rewards:markSeen', ids),
   resetProgress: () => ipcRenderer.invoke('state:reset'),
+  exportSave: () => ipcRenderer.invoke('save:export'),
+  importSave: (code) => ipcRenderer.invoke('save:import', code),
 
   /* Fenster / Overlay */
   openDashboard: () => ipcRenderer.invoke('dashboard:open'),

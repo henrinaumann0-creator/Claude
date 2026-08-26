@@ -294,6 +294,33 @@
     snack('Lieblingsecke geändert.');
   });
 
+  $('btnExport').addEventListener('click', async () => {
+    const code = await window.pets.exportSave();
+    $('saveCode').value = code;
+    $('saveCode').select();
+    try {
+      await navigator.clipboard.writeText(code);
+      snack('Code kopiert – auf dem anderen Gerät einfügen.');
+    } catch (_) {
+      snack('Code erzeugt – markieren und kopieren.');
+    }
+  });
+
+  $('btnImport').addEventListener('click', async () => {
+    const code = $('saveCode').value.trim();
+    if (!code) return snack('Bitte zuerst einen Code einfügen.');
+    if (!confirm('Der eingespielte Spielstand ersetzt den aktuellen Fortschritt. Fortfahren?')) return;
+    const res = await window.pets.importSave(code);
+    if (res.ok) {
+      snap = await window.pets.getState();
+      render();
+      $('saveCode').value = '';
+      snack('Spielstand übernommen!');
+    } else {
+      snack(res.error || 'Der Code konnte nicht gelesen werden.');
+    }
+  });
+
   $('btnReset').addEventListener('click', async () => {
     if (!confirm('Wirklich den gesamten Fortschritt zurücksetzen? Level, XP und alle Belohnungen gehen verloren.')) return;
     snap = await window.pets.resetProgress();

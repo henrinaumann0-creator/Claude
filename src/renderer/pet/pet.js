@@ -15,7 +15,7 @@
     toastText: $('toastText'), confetti: $('confetti')
   };
 
-  const SIZE = 132;
+  const SIZE = typeof window.__petSize === 'number' ? window.__petSize : 132;
   const MARGIN = 14;
 
   const S = {
@@ -40,6 +40,12 @@
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const rand = (a, b) => a + Math.random() * (b - a);
   const view = () => ({ w: window.innerWidth, h: window.innerHeight });
+  /** Bereich, in dem sich das Pet bewegen darf. Die Web-Version setzt
+      `window.__petRoam`, damit Kopfzeile und Tab-Leiste frei bleiben. */
+  const roam = () => {
+    const r = typeof window.__petRoam === 'function' ? window.__petRoam() : null;
+    return r || { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight };
+  };
 
 
   /* =========================================================
@@ -126,21 +132,21 @@
      Position
      ========================================================= */
   function place(x, y, animate) {
-    const v = view();
-    S.x = clamp(x, MARGIN, v.w - SIZE - MARGIN);
-    S.y = clamp(y, MARGIN, v.h - SIZE - MARGIN);
+    const r = roam();
+    S.x = clamp(x, r.x + MARGIN, r.x + r.w - SIZE - MARGIN);
+    S.y = clamp(y, r.y + MARGIN, r.y + r.h - SIZE - MARGIN);
     el.pet.style.setProperty('--x', S.x + 'px');
     el.pet.style.setProperty('--y', S.y + 'px');
     el.pet.style.transition = animate ? 'transform .5s var(--ease-out)' : '';
-    el.bubble.dataset.side = S.x + SIZE / 2 > v.w / 2 ? 'right' : 'left';
+    el.bubble.dataset.side = S.x + SIZE / 2 > window.innerWidth / 2 ? 'right' : 'left';
   }
 
   function homePosition() {
-    const v = view();
+    const r = roam();
     const right = !S.snap || S.snap.state.settings.side !== 'left';
     return {
-      x: right ? v.w - SIZE - 28 : 28,
-      y: v.h - SIZE - 10
+      x: right ? r.x + r.w - SIZE - 24 : r.x + 24,
+      y: r.y + r.h - SIZE - 10
     };
   }
 
@@ -172,9 +178,9 @@
   function walkTo(tx, ty, opts = {}) {
     if (S.walking) cancelAnimationFrame(S.walking.raf);
 
-    const v = view();
-    tx = clamp(tx, MARGIN, v.w - SIZE - MARGIN);
-    ty = clamp(ty, MARGIN, v.h - SIZE - MARGIN);
+    const r = roam();
+    tx = clamp(tx, r.x + MARGIN, r.x + r.w - SIZE - MARGIN);
+    ty = clamp(ty, r.y + MARGIN, r.y + r.h - SIZE - MARGIN);
 
     const sx = S.x, sy = S.y;
     const dx = tx - sx, dy = ty - sy;
@@ -222,15 +228,16 @@
 
   /** Zufälliges Ziel – bevorzugt in der unteren Bildschirmhälfte. */
   function randomTarget() {
-    const v = view();
+    const r = roam();
+    const minDist = Math.min(220, r.w * 0.45);
     let tx, ty, tries = 0;
     do {
-      tx = rand(MARGIN, v.w - SIZE - MARGIN);
+      tx = rand(r.x + MARGIN, r.x + r.w - SIZE - MARGIN);
       ty = Math.random() < 0.72
-        ? rand(v.h * 0.55, v.h - SIZE - MARGIN)   // meistens unten
-        : rand(v.h * 0.15, v.h * 0.6);            // gelegentlich höher
+        ? rand(r.y + r.h * 0.55, r.y + r.h - SIZE - MARGIN)   // meistens unten
+        : rand(r.y + r.h * 0.12, r.y + r.h * 0.6);            // gelegentlich höher
       tries++;
-    } while (Math.hypot(tx - S.x, ty - S.y) < 220 && tries < 12);
+    } while (Math.hypot(tx - S.x, ty - S.y) < minDist && tries < 12);
     return { x: tx, y: ty };
   }
 
@@ -467,8 +474,8 @@
     if (moved) {
       setMode('idle');
       // Sanft auf den Boden absetzen
-      const v = view();
-      const floorY = v.h - SIZE - 10;
+      const r = roam();
+      const floorY = r.y + r.h - SIZE - 10;
       if (S.y < floorY - 40) {
         place(S.x, S.y);
         walkTo(S.x, floorY, { xp: false, thought: false, speedFactor: 1.6 });
@@ -477,6 +484,61 @@
       onPetClick();
     }
   });
+
+
+  /* --- Touch: Tippen, Ziehen, Langdrücken (Web/Handy) --- */
+  let longPressTimer = null;
+  let longPressed = false;
+
+  el.art.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) return;
+    const t = e.touches[0];
+    wake();
+    longPressed = false;
+    S.drag = {
+      startX: t.clientX, startY: t.clientY,
+      offX: t.clientX - S.x, offY: t.clientY - S.y,
+      moved: false, touch: true
+    };
+    if (S.walking) { cancelAnimationFrame(S.walking.raf); S.walking = null; setMode('idle'); }
+    clearTimeout(longPressTimer);
+    longPressTimer = setTimeout(() => {
+      longPressed = true;
+      S.drag = null;
+      openMenu(t.clientX, t.clientY);
+    }, 480);
+  }, { passive: true });
+
+  window.addEventListener('touchmove', (e) => {
+    if (!S.drag || !S.drag.touch) return;
+    const t = e.touches[0];
+    const dist = Math.hypot(t.clientX - S.drag.startX, t.clientY - S.drag.startY);
+    if (dist > 8) {
+      clearTimeout(longPressTimer);
+      if (!S.drag.moved) { S.drag.moved = true; setMode('dragged'); hideThought(); }
+      place(t.clientX - S.drag.offX, t.clientY - S.drag.offY);
+      if (e.cancelable) e.preventDefault();
+    }
+  }, { passive: false });
+
+  window.addEventListener('touchend', () => {
+    clearTimeout(longPressTimer);
+    if (!S.drag || !S.drag.touch) return;
+    const moved = S.drag.moved;
+    S.drag = null;
+    if (moved) {
+      setMode('idle');
+      const r = roam();
+      const floorY = r.y + r.h - SIZE - 10;
+      if (S.y < floorY - 40) walkTo(S.x, floorY, { xp: false, thought: false, speedFactor: 1.6 });
+    } else if (!longPressed) {
+      onPetClick();
+    }
+  });
+
+  window.addEventListener('touchstart', (e) => {
+    if (S.menuOpen && !el.menu.contains(e.target) && !el.art.contains(e.target)) closeMenu();
+  }, { passive: true });
 
   el.art.addEventListener('contextmenu', (e) => {
     e.preventDefault();

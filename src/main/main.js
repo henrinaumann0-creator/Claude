@@ -370,6 +370,27 @@ function registerIpc() {
     return snapshot();
   });
 
+  ipcMain.handle('save:export', () => {
+    store.flush();
+    return Buffer.from(JSON.stringify(store.get()), 'utf8').toString('base64');
+  });
+
+  ipcMain.handle('save:import', (_e, code) => {
+    try {
+      const json = Buffer.from(String(code || '').trim(), 'base64').toString('utf8');
+      const parsed = JSON.parse(json);
+      if (typeof parsed !== 'object' || typeof parsed.totalXp !== 'number') throw new Error('Ungültig');
+      store.reset();
+      store.update(parsed);
+      store.flush();
+      broadcast({ reset: true });
+      buildTrayMenu();
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: 'Der Code konnte nicht gelesen werden.' };
+    }
+  });
+
   ipcMain.handle('state:reset', () => {
     store.reset();
     broadcast({ reset: true });

@@ -4,17 +4,35 @@
 
 # Claude Pets
 
-**Ein animierter Pixel-Begleiter für deinen Desktop – mit Level-System, freischaltbaren Belohnungen und lesbaren Gedankenblasen.**
+**Ein animierter Pixel-Begleiter mit Level-System, freischaltbaren Belohnungen und lesbaren Gedankenblasen.**
 
-Helles Orange auf warmem Grau. Läuft auf Windows, macOS und Linux.
+Helles Orange auf warmem Grau. Als Desktop-App für Windows, macOS und Linux –
+und als Web-App (PWA) für Browser und Handy.
 
 </div>
 
 ---
 
+## Zwei Wege, dieselbe App
+
+| | Desktop-App | Web-App (PWA) |
+| --- | --- | --- |
+| Läuft auf | Windows · macOS · Linux | jedem Browser, Handy inklusive |
+| Das Pet lebt | als transparentes Overlay **über allen Fenstern** | über der App-Oberfläche |
+| Bedienung | Links-/Rechtsklick, Ziehen | Tippen, Halten, Ziehen |
+| Zusätzlich | Tray-Symbol, Autostart | zum Startbildschirm hinzufügbar, offline nutzbar |
+| Spielstand | lokal im Benutzerordner | lokal im Browser |
+
+Beide Varianten teilen sich denselben Code: Charaktere, Level-Kurve, Belohnungen und
+Gedanken liegen in `src/shared/` bzw. `src/renderer/` und werden für das Web nur neu
+zusammengesetzt. Über einen **Spielstand-Code** (Einstellungen → *Spielstand übertragen*)
+nimmst du deinen Fortschritt von einem Gerät aufs andere mit.
+
+---
+
 ## Was die App macht
 
-Dein Pet sitzt als **transparentes Overlay** unten rechts auf dem Bildschirm – über allen Fenstern, aber klick-durchlässig: Du arbeitest ganz normal weiter, bis du den Mauszeiger wirklich auf das Tier bewegst.
+Dein Pet sitzt unten rechts – in der Desktop-App als **transparentes Overlay** über allen Fenstern, aber klick-durchlässig: Du arbeitest ganz normal weiter, bis du den Mauszeiger wirklich auf das Tier bewegst.
 
 * 🐾 **Sechs Pixel-Charaktere** – Fuchs, Katze, Blob, Roboter, Pinguin, Drache. Jeder mit eigenem Laufzyklus, Blinzeln, Schlaf- und Freude-Animation.
 * 💭 **Gedankenblasen** mit Schreibmaschinen-Effekt – über 80 Sprüche in sechs Paketen, dazu tages- und situationsabhängige Gedanken.
@@ -32,6 +50,8 @@ Dein Pet sitzt als **transparentes Overlay** unten rechts auf dem Bildschirm –
 | **Linksklick** auf das Pet | Streicheln (+XP) – danach rennt es zu einem zufälligen Punkt auf dem Bildschirm |
 | **Ziehen** mit gedrückter linker Maustaste | Pet an eine andere Stelle setzen (es lässt sich anschließend zu Boden gleiten) |
 | **Rechtsklick** auf das Pet | Schnellmenü: Spazieren · Gedanke · Schlafen · Dashboard · **Pet entfernen** |
+| **Tippen** (Handy) | wie Linksklick |
+| **Gedrückt halten** (Handy) | öffnet das Schnellmenü |
 | **Esc** | Menü und Gedankenblase schließen |
 | **Tray-Symbol** (Klick) | Dashboard öffnen |
 | **Tray-Symbol** (Rechtsklick) | Pet ein-/ausblenden, Level ablesen, beenden |
@@ -58,6 +78,20 @@ npm run dist:linux   # Linux    (AppImage)
 ```
 
 Die Pakete landen in `dist/`. Für die Entwicklung mit offenen DevTools: `npm run dev`.
+
+### Web-Version
+
+```bash
+npm run build:web    # baut nach dist-web/
+npm run serve:web    # baut und startet http://localhost:4173
+```
+
+`dist-web/` ist reine Statik ohne Abhängigkeiten und lässt sich überall hosten.
+Die mitgelieferte `vercel.json` beschreibt den Build (`node build/build-web.js` →
+`dist-web/`), sodass jeder Push automatisch neu veröffentlicht wird.
+
+Auf dem Handy: Seite im Browser öffnen → *Zum Home-Bildschirm hinzufügen*. Danach
+startet Claude Pets wie eine normale App im Vollbild und läuft auch offline.
 
 ---
 
@@ -133,7 +167,26 @@ src/
 │  ├─ pet/             Overlay: Pixel-Charaktere, Frame-Treiber, Verhalten
 │  └─ dashboard/       Dashboard-Oberfläche
 └─ assets/             App- und Tray-Icons
+
+web/
+├─ shell.html          Gerüst der Web-Version (Platzhalter für geteiltes Markup)
+├─ core.js             Ersatz für die Electron-Bridge: derselbe `window.pets`,
+│                      aber mit localStorage statt IPC
+├─ app.js              Tab-Leiste, Laufbereich, PWA-Installation
+├─ web.css             Mobiles Layout und Browser-Anpassungen
+└─ sw.js               Service Worker für den Offline-Betrieb
+
+build/
+├─ make-icons.js       erzeugt alle PNG-Symbole
+├─ build-web.js        setzt dist-web/ aus src/ und web/ zusammen
+└─ serve-web.js        kleiner Server zum Ausprobieren
 ```
+
+**Eine Quelle, zwei Ziele:** `pet.js` und `dashboard.js` laufen unverändert in beiden
+Varianten. Möglich wird das durch `web/core.js`, das exakt dieselbe Schnittstelle
+bereitstellt wie der Electron-Preload (`window.pets`). `build-web.js` schneidet das
+Markup aus den bestehenden HTML-Dateien und setzt es in die Web-Hülle ein – es gibt
+also keine doppelt gepflegten Kopien.
 
 **Pixel-Grafik ohne Bilddateien:** Jeder Charakter wird zur Laufzeit auf einem 32 × 32-Raster aus geometrischen Grundformen gezeichnet, automatisch umrandet und schattiert und dann als SVG aus Pixel-Rechtecken ausgegeben (`shape-rendering: crispEdges`). Dadurch lässt sich jede Farbpalette auf jeden Charakter anwenden, und die Sprites bleiben in jeder Größe gestochen scharf. Animiert wird wie in klassischer Pixel-Kunst: echte Frame-Wechsel statt weicher Transformationen.
 

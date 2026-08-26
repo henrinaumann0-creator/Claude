@@ -10,7 +10,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-.app { display: grid; grid-template-columns: 232px 1fr; height: 100vh; }
+.app { display: grid; grid-template-columns: 232px minmax(0, 1fr); height: 100vh; }
 
 /* ------------------------------------------------------------
    Seitenleiste
@@ -480,10 +480,25 @@ input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.15); }
 @keyframes snackOut { to { opacity: 0; transform: translate(-50%, 10px); } }
 
 @media (max-width: 940px) {
-  .app { grid-template-columns: 76px 1fr; }
+  .app { grid-template-columns: 76px minmax(0, 1fr); }
   .brand-text, .nav-item span:not(.nav-ico), .side-card, .ghost-btn { display: none; }
-  .hero, .wardrobe { grid-template-columns: 1fr; }
+  .hero, .wardrobe { grid-template-columns: minmax(0, 1fr); }
   .wardrobe-preview { position: static; }
 }
+
+.panel-note { margin: -6px 0 14px; font-size: 12.5px; color: var(--c-ink-3); line-height: 1.5; }
+.transfer { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.code-box {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-sm);
+  background: var(--c-bg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px; line-height: 1.5; color: var(--c-ink-2);
+  resize: vertical;
+  word-break: break-all;
+}
+.code-box:focus { outline: none; border-color: var(--c-orange); box-shadow: 0 0 0 3px rgba(217,119,87,.15); }
 
 [hidden] { display: none !important; }

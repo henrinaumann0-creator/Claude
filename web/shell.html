@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+  <title>Claude Pets</title>
+  <meta name="description" content="Ein animierter Pixel-Begleiter mit Level-System, Belohnungen und Gedankenblasen – im Browser und auf dem Handy." />
+  <meta name="theme-color" content="#D97757" />
+  <meta name="color-scheme" content="light" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Claude Pets" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icons/icon-64.png" />
+  <link rel="apple-touch-icon" href="icons/icon-180.png" />
+
+  <link rel="stylesheet" href="lib/theme.css" />
+  <link rel="stylesheet" href="lib/dashboard.css" />
+  <link rel="stylesheet" href="lib/pet.css" />
+  <link rel="stylesheet" href="web.css" />
+</head>
+<body>
+
+  <!-- Kopfzeile (nur schmale Bildschirme) -->
+  <header class="topbar">
+    <span class="topbar-brand">
+      <img src="icons/icon-64.png" alt="" width="24" height="24" />
+      Claude Pets
+    </span>
+    <span class="topbar-right">
+      <button class="install-btn" id="installBtn" hidden>App installieren</button>
+      <span class="topbar-level">Lv <b id="topLevel">1</b></span>
+    </span>
+  </header>
+
+<!--#DASHBOARD#-->
+
+<!--#STAGE#-->
+
+  <script src="lib/progression.js"></script>
+  <script src="lib/thoughts.js"></script>
+  <script src="lib/pets.js"></script>
+  <script src="core.js"></script>
+  <script src="lib/pet.js"></script>
+  <script src="lib/dashboard.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
