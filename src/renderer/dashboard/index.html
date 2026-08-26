@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;" />
+  <title>Claude Pets · Dashboard</title>
+  <link rel="stylesheet" href="../../shared/theme.css" />
+  <link rel="stylesheet" href="dashboard.css" />
+</head>
+<body>
+<div class="app">
+
+  <!-- ---------- Seitenleiste ---------- -->
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-mark"><img src="../../assets/icon-64.png" alt="" width="26" height="26" /></span>
+      <span class="brand-text">
+        <strong>Claude Pets</strong>
+        <small>Dein Desktop-Begleiter</small>
+      </span>
+    </div>
+
+    <nav class="nav">
+      <button class="nav-item is-active" data-view="home">
+        <span class="nav-ico">🏠</span> Übersicht
+      </button>
+      <button class="nav-item" data-view="rewards">
+        <span class="nav-ico">🎁</span> Belohnungen
+        <span class="nav-badge" id="navBadge" hidden>0</span>
+      </button>
+      <button class="nav-item" data-view="wardrobe">
+        <span class="nav-ico">✨</span> Ausstattung
+      </button>
+      <button class="nav-item" data-view="stats">
+        <span class="nav-ico">📈</span> Statistik
+      </button>
+      <button class="nav-item" data-view="settings">
+        <span class="nav-ico">⚙️</span> Einstellungen
+      </button>
+    </nav>
+
+    <div class="side-card">
+      <div class="side-card-row">
+        <span>Level</span><strong id="sideLevel">1</strong>
+      </div>
+      <div class="meter"><i id="sideBar" style="width:0%"></i></div>
+      <small id="sideXp">0 / 60 XP</small>
+    </div>
+
+    <button class="ghost-btn" id="toggleVisible">Pet anzeigen</button>
+  </aside>
+
+  <!-- ---------- Inhalt ---------- -->
+  <main class="content">
+
+    <!-- ===== Übersicht ===== -->
+    <section class="view is-active" data-view="home">
+      <header class="view-head">
+        <div>
+          <h1>Übersicht</h1>
+          <p class="sub">Alles über <span id="headName">Nova</span> auf einen Blick.</p>
+        </div>
+        <div class="streak-chip" id="streakChip" title="Tage in Folge">
+          <span class="flame">🔥</span> <strong id="streakVal">0</strong> Tage
+        </div>
+      </header>
+
+      <div class="hero">
+        <div class="hero-stage">
+          <div class="hero-glow"></div>
+          <div class="hero-pet" id="heroPet"></div>
+          <div class="hero-floor"></div>
+        </div>
+
+        <div class="hero-info">
+          <div class="name-row">
+            <input id="petName" class="name-input" maxlength="18" spellcheck="false" />
+            <span class="lvl-pill">Level <b id="lvlNum">1</b></span>
+          </div>
+
+          <div class="xp-block">
+            <div class="xp-top">
+              <span id="xpLabel">0 / 60 XP</span>
+              <span id="xpPct" class="muted">0 %</span>
+            </div>
+            <div class="meter meter--lg"><i id="xpBar" style="width:0%"></i></div>
+            <p class="next-hint" id="nextHint">Nächste Belohnung bei Level 3: Halstuch</p>
+          </div>
+
+          <div class="gauges">
+            <div class="gauge">
+              <div class="gauge-top"><span>Sattheit</span><b id="hungerVal">100 %</b></div>
+              <div class="meter meter--sm"><i id="hungerBar" class="bar--food" style="width:100%"></i></div>
+            </div>
+            <div class="gauge">
+              <div class="gauge-top"><span>Gesamt-XP</span><b id="totalXp">0</b></div>
+              <div class="meter meter--sm"><i class="bar--muted" style="width:100%"></i></div>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="btn btn--primary" id="btnFeed"><span>🍎</span> Füttern</button>
+            <button class="btn" id="btnPlay"><span>🎾</span> Spielen</button>
+            <button class="btn" id="btnWalk"><span>🐾</span> Spazieren</button>
+            <button class="btn" id="btnThought"><span>💭</span> Gedanke</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="cards" id="homeCards"></div>
+    </section>
+
+    <!-- ===== Belohnungen ===== -->
+    <section class="view" data-view="rewards">
+      <header class="view-head">
+        <div>
+          <h1>Belohnungen</h1>
+          <p class="sub">Jedes Level schaltet etwas Neues frei.</p>
+        </div>
+        <div class="filters" id="rewardFilters">
+          <button class="chip is-active" data-filter="all">Alle</button>
+          <button class="chip" data-filter="pet">Pets</button>
+          <button class="chip" data-filter="accessory">Accessoires</button>
+          <button class="chip" data-filter="palette">Farben</button>
+          <button class="chip" data-filter="thoughts">Gedanken</button>
+          <button class="chip" data-filter="effect">Effekte</button>
+          <button class="chip" data-filter="perk">Fähigkeiten</button>
+        </div>
+      </header>
+      <div class="road" id="road"></div>
+    </section>
+
+    <!-- ===== Ausstattung ===== -->
+    <section class="view" data-view="wardrobe">
+      <header class="view-head">
+        <div>
+          <h1>Ausstattung</h1>
+          <p class="sub">Wähle Charakter, Farbe, Accessoire und Effekt.</p>
+        </div>
+      </header>
+      <div class="wardrobe">
+        <div class="wardrobe-preview">
+          <div class="hero-glow"></div>
+          <div class="hero-pet" id="wardrobePet"></div>
+          <div class="hero-floor"></div>
+        </div>
+        <div class="wardrobe-panels">
+          <div class="panel"><h3>Charakter</h3><div class="grid grid--pets" id="slotPet"></div></div>
+          <div class="panel"><h3>Farbe</h3><div class="grid grid--sm" id="slotPalette"></div></div>
+          <div class="panel"><h3>Accessoire</h3><div class="grid grid--sm" id="slotAccessory"></div></div>
+          <div class="panel"><h3>Effekt</h3><div class="grid grid--sm" id="slotEffect"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Statistik ===== -->
+    <section class="view" data-view="stats">
+      <header class="view-head">
+        <div>
+          <h1>Statistik</h1>
+          <p class="sub">Was ihr bisher zusammen erlebt habt.</p>
+        </div>
+      </header>
+      <div class="stats-grid" id="statsGrid"></div>
+      <div class="panel panel--wide">
+        <h3>XP-Quellen</h3>
+        <div class="xp-sources" id="xpSources"></div>
+      </div>
+    </section>
+
+    <!-- ===== Einstellungen ===== -->
+    <section class="view" data-view="settings">
+      <header class="view-head">
+        <div>
+          <h1>Einstellungen</h1>
+          <p class="sub">Verhalten und Erscheinungsbild.</p>
+        </div>
+      </header>
+
+      <div class="panel">
+        <label class="row-toggle">
+          <span><strong>Pet anzeigen</strong><small>Overlay auf dem Desktop einblenden</small></span>
+          <input type="checkbox" id="setVisible" class="switch" />
+        </label>
+        <label class="row-toggle">
+          <span><strong>Gedankenblasen</strong><small>Dein Pet denkt laut mit</small></span>
+          <input type="checkbox" id="setThoughts" class="switch" />
+        </label>
+        <label class="row-toggle">
+          <span><strong>Frei herumlaufen</strong><small>Geht ab und zu von allein spazieren</small></span>
+          <input type="checkbox" id="setWander" class="switch" />
+        </label>
+        <label class="row-toggle">
+          <span><strong>Mit dem System starten</strong><small>Beim Anmelden automatisch starten</small></span>
+          <input type="checkbox" id="setAutostart" class="switch" />
+        </label>
+        <label class="row-slider">
+          <span><strong>Abstand der Gedanken</strong><small id="intervalLabel">alle 45 Sekunden</small></span>
+          <input type="range" id="setInterval" min="15" max="240" step="5" />
+        </label>
+        <label class="row-slider">
+          <span><strong>Lieblingsecke</strong><small>Wo dein Pet chillt</small></span>
+          <select id="setSide" class="select">
+            <option value="right">Unten rechts</option>
+            <option value="left">Unten links</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="panel panel--danger">
+        <div class="danger-row">
+          <span><strong>Fortschritt zurücksetzen</strong><small>Level, XP und Belohnungen gehen verloren.</small></span>
+          <button class="btn btn--danger" id="btnReset">Zurücksetzen</button>
+        </div>
+      </div>
+
+      <p class="foot">Claude Pets · v1.0.0 · Rechtsklick auf das Pet öffnet das Schnellmenü.</p>
+    </section>
+  </main>
+</div>
+
+<div id="snack" class="snackbar" hidden></div>
+
+<script src="../../shared/progression.js"></script>
+<script src="../../shared/thoughts.js"></script>
+<script src="../pet/pets.js"></script>
+<script src="dashboard.js"></script>
+</body>
+</html>

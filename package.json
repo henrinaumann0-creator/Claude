@@ -1,0 +1,31 @@
+{
+  "name": "claude-pets",
+  "productName": "Claude Pets",
+  "version": "1.0.0",
+  "description": "Ein animierter Desktop-Begleiter mit Level-System, Belohnungen und Gedankenblasen – im Claude-Look.",
+  "main": "src/main/main.js",
+  "author": "Henri Naumann",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "de.henri.claudepets",
+    "productName": "Claude Pets",
+    "files": ["src/**/*", "package.json"],
+    "directories": { "output": "dist", "buildResources": "build" },
+    "win": { "target": ["nsis"] },
+    "mac": { "target": ["dmg"], "category": "public.app-category.entertainment" },
+    "linux": { "target": ["AppImage"], "category": "Game" }
+  }
+}

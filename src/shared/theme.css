@@ -1,0 +1,81 @@
+/* ============================================================
+   Claude Pets – Design Tokens
+   Helles Orange + warme Grautöne, angelehnt an Claude.
+   ============================================================ */
+:root {
+  /* Marke */
+  --c-orange:        #D97757;
+  --c-orange-soft:   #E8987C;
+  --c-orange-light:  #F4C8B4;
+  --c-orange-wash:   #FBEDE6;
+  --c-orange-deep:   #BF5C3C;
+
+  /* Warme Neutraltöne */
+  --c-bg:            #FAF9F5;
+  --c-bg-sunk:       #F2F0E9;
+  --c-surface:       #FFFFFF;
+  --c-surface-2:     #F7F5EF;
+  --c-line:          #E7E4DA;
+  --c-line-strong:   #D8D4C7;
+
+  --c-ink:           #2E2E2B;
+  --c-ink-2:         #56564F;
+  --c-ink-3:         #86867C;
+  --c-ink-4:         #A8A89C;
+
+  /* Dunkle Flächen (Overlay-Panels, Tooltips) */
+  --c-dark:          #26262499;
+  --c-dark-solid:    #262624;
+
+  /* Akzente für Belohnungs-Typen */
+  --c-pet:           #D97757;
+  --c-accessory:     #B08A5E;
+  --c-palette:       #7C9A8E;
+  --c-thought:       #8A7CA8;
+  --c-effect:        #C9A227;
+
+  /* Radien & Schatten */
+  --r-xs: 6px;
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 28px;
+  --r-pill: 999px;
+
+  --sh-1: 0 1px 2px rgba(46,46,43,.06), 0 1px 3px rgba(46,46,43,.05);
+  --sh-2: 0 2px 6px rgba(46,46,43,.07), 0 8px 20px rgba(46,46,43,.06);
+  --sh-3: 0 10px 34px rgba(46,46,43,.13), 0 2px 8px rgba(46,46,43,.07);
+  --sh-glow: 0 6px 26px rgba(217,119,87,.32);
+
+  /* Motion */
+  --ease-out: cubic-bezier(.22,.9,.28,1);
+  --ease-spring: cubic-bezier(.34,1.56,.44,1);
+
+  --font: "Inter", "Segoe UI Variable Text", "Segoe UI", -apple-system,
+          BlinkMacSystemFont, "SF Pro Text", Roboto, "Helvetica Neue", sans-serif;
+  --font-display: "Inter", "Segoe UI Variable Display", "Segoe UI",
+          -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+::selection { background: var(--c-orange-light); color: var(--c-ink); }
+
+/* Scrollbars im Claude-Stil */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--c-line-strong);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: var(--r-pill);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--c-ink-4); background-clip: content-box; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+}

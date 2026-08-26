@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;" />
+  <title>Claude Pets · Overlay</title>
+  <link rel="stylesheet" href="../../shared/theme.css" />
+  <link rel="stylesheet" href="pet.css" />
+</head>
+<body>
+  <div id="stage" class="stage">
+
+    <!-- Das Pet -->
+    <div id="pet" class="pet is-idle" data-facing="left">
+      <div class="pet-fx" id="fx" aria-hidden="true"></div>
+
+      <div class="bubble" id="bubble" hidden>
+        <div class="bubble-box">
+          <p class="bubble-text" id="bubbleText"></p>
+        </div>
+        <span class="bubble-dot bubble-dot--1"></span>
+        <span class="bubble-dot bubble-dot--2"></span>
+        <span class="bubble-dot bubble-dot--3"></span>
+      </div>
+
+      <div class="pet-art" id="art"></div>
+
+      <div class="pet-hint" id="hint" hidden>
+        <span class="pet-hint-key">Klick</span> laufen
+        <span class="pet-hint-sep"></span>
+        <span class="pet-hint-key">Rechtsklick</span> Menü
+      </div>
+
+      <div class="floaters" id="floaters" aria-hidden="true"></div>
+    </div>
+
+    <!-- Kontextmenü (Rechtsklick) -->
+    <div id="menu" class="menu" hidden>
+      <div class="menu-head">
+        <span class="menu-avatar" id="menuAvatar"></span>
+        <span class="menu-title">
+          <strong id="menuName">Nova</strong>
+          <small id="menuLevel">Level 1</small>
+        </span>
+      </div>
+      <div class="menu-bar"><i id="menuBar" style="width:0%"></i></div>
+      <button class="menu-item" data-action="walk">
+        <span class="menu-icon">🐾</span> Spazieren gehen
+      </button>
+      <button class="menu-item" data-action="thought">
+        <span class="menu-icon">💭</span> Neuer Gedanke
+      </button>
+      <button class="menu-item" data-action="sleep">
+        <span class="menu-icon">😴</span> Schlafen legen
+      </button>
+      <button class="menu-item" data-action="dashboard">
+        <span class="menu-icon">📊</span> Dashboard öffnen
+      </button>
+      <div class="menu-sep"></div>
+      <button class="menu-item menu-item--danger" data-action="remove">
+        <span class="menu-icon">✕</span> Pet entfernen
+      </button>
+    </div>
+
+    <!-- Level-Up-Banner -->
+    <div id="toast" class="toast" hidden>
+      <div class="toast-glow"></div>
+      <div class="toast-badge" id="toastBadge">2</div>
+      <div class="toast-body">
+        <strong id="toastTitle">Level 2 erreicht!</strong>
+        <span id="toastText">Neue Belohnung freigeschaltet</span>
+      </div>
+    </div>
+
+    <div id="confetti" class="confetti-layer" aria-hidden="true"></div>
+  </div>
+
+  <script src="../../shared/progression.js"></script>
+  <script src="../../shared/thoughts.js"></script>
+  <script src="pets.js"></script>
+  <script src="pet.js"></script>
+</body>
+</html>
