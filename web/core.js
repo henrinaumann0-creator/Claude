@@ -9,6 +9,7 @@
 
 (() => {
   const P = window.Progression;
+  const A = window.Achievements;
 
   // Auf schmalen Bildschirmen ist ein kleineres Pet angenehmer.
   window.__petSize = window.innerWidth < 560 ? 104 : 132;
@@ -31,7 +32,14 @@
       bestStreak: 0,
       lastFedAt: 0,
       lastPlayedAt: 0,
-      stats: { pets: 0, walks: 0, thoughts: 0, minutes: 0, feeds: 0, plays: 0, levelUps: 0 },
+      stats: {
+        pets: 0, walks: 0, thoughts: 0, minutes: 0, feeds: 0, plays: 0, levelUps: 0,
+        drags: 0, distance: 0, nightPets: 0, morningPets: 0
+      },
+      achievements: [],
+      worn: [],
+      petsTried: ['nova'],
+      palettesTried: ['amber'],
       equipped: { pet: 'nova', accessory: null, palette: 'amber', effect: null },
       seenRewards: ['nova', 'amber', 'alltag'],
       settings: {
@@ -95,6 +103,7 @@
     const hunger = hungerOf();
     return {
       state,
+      achievements: A.summary(state, prog.level),
       level: prog.level,
       xpInLevel: prog.xpInLevel,
       xpForNext: prog.xpForNext,
@@ -128,6 +137,21 @@
   }
 
   /* ---------------------------------------------------------
+     Erfolge
+     --------------------------------------------------------- */
+  function checkAchievements() {
+    const gained = [];
+    for (let pass = 0; pass < 3; pass++) {
+      const level = P.levelFromTotalXp(state.totalXp).level;
+      const res = A.evaluate(state, level);
+      if (!res.newly.length) break;
+      update({ achievements: res.all, totalXp: state.totalXp + res.xp });
+      gained.push(...res.newly);
+    }
+    return gained;
+  }
+
+  /* ---------------------------------------------------------
      XP
      --------------------------------------------------------- */
   const lastEventAt = Object.create(null);
@@ -153,17 +177,29 @@
     const statKey = { pet: 'pets', walk: 'walks', thought: 'thoughts', feed: 'feeds', play: 'plays', idle: 'minutes' }[kind];
     const patch = { totalXp };
     if (statKey) patch.stats = { [statKey]: (state.stats[statKey] || 0) + 1 };
+    if (kind === 'pet') {
+      const hour = new Date().getHours();
+      if (hour >= 23 || hour < 5) patch.stats = Object.assign(patch.stats || {}, { nightPets: (state.stats.nightPets || 0) + 1 });
+      else if (hour >= 5 && hour < 8) patch.stats = Object.assign(patch.stats || {}, { morningPets: (state.stats.morningPets || 0) + 1 });
+    }
     if (after > before) {
       patch.stats = Object.assign(patch.stats || {}, { levelUps: (state.stats.levelUps || 0) + (after - before) });
     }
     update(patch);
 
-    const leveledUp = after > before;
-    const rewards = [];
-    if (leveledUp) for (let l = before + 1; l <= after; l++) rewards.push(...P.rewardsAtLevel(l));
+    const earned = checkAchievements();
+    const finalLevel = P.levelFromTotalXp(state.totalXp).level;
 
-    broadcast(leveledUp ? { levelUp: { from: before, to: after, rewards } } : null);
-    return { gained: amount, leveledUp, level: after, rewards };
+    const leveledUp = finalLevel > before;
+    const rewards = [];
+    if (leveledUp) for (let l = before + 1; l <= finalLevel; l++) rewards.push(...P.rewardsAtLevel(l));
+
+    const extra = {};
+    if (leveledUp) extra.levelUp = { from: before, to: finalLevel, rewards };
+    if (earned.length) extra.achievementsUnlocked = earned;
+    broadcast(Object.keys(extra).length ? extra : null);
+
+    return { gained: amount, leveledUp, level: finalLevel, rewards, achievements: earned };
   }
 
   /* ---------------------------------------------------------
@@ -214,11 +250,20 @@
       const level = P.levelFromTotalXp(state.totalXp).level;
       if (id !== null && !P.isUnlocked(id, level)) return snapshot();
       update({ equipped: { [slot]: id } });
+      if (id) {
+        const listKey = { accessory: 'worn', pet: 'petsTried', palette: 'palettesTried' }[slot];
+        if (listKey) {
+          const list = state[listKey] || [];
+          if (!list.includes(id)) update({ [listKey]: list.concat(id) });
+        }
+      }
       if (slot === 'pet' && id) {
         const reward = P.byId(id);
         if (reward) update({ petName: reward.name });
       }
-      broadcast({ equipChanged: slot });
+      const earned = checkAchievements();
+      broadcast(earned.length ? { equipChanged: slot, achievementsUnlocked: earned }
+                              : { equipChanged: slot });
       return snapshot();
     },
 
@@ -268,6 +313,14 @@
 
     async command(type) { sendCommand({ type }); return true; },
 
+    async trackStat(key, amount) {
+      if (!['drags', 'distance'].includes(key)) return false;
+      update({ stats: { [key]: (state.stats[key] || 0) + Math.max(0, Math.round(amount || 1)) } });
+      const earned = checkAchievements();
+      if (earned.length) broadcast({ achievementsUnlocked: earned });
+      return true;
+    },
+
     /* Spielstand zwischen Handy und Desktop übertragen */
     async exportSave() {
       saveNow();
@@ -298,7 +351,7 @@
 
     /* Interna für app.js */
     _emitResize: (bounds) => resizeListeners.forEach((cb) => cb(bounds)),
-    _checkDailyBonus: checkDailyBonus,
+    _checkDailyBonus: () => { checkAchievements(); checkDailyBonus(); },
     _broadcast: broadcast
   };
 })();

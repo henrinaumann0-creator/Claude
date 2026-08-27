@@ -30,6 +30,7 @@ contextBridge.exposeInMainWorld('pets', {
   rename: (name) => ipcRenderer.invoke('pet:rename', name),
   feed: () => ipcRenderer.invoke('pet:feed'),
   command: (type) => ipcRenderer.invoke('pet:command', type),
+  trackStat: (key, amount) => ipcRenderer.invoke('stat:track', key, amount),
   play: () => ipcRenderer.invoke('pet:play'),
   setSettings: (patch) => ipcRenderer.invoke('settings:set', patch),
   markRewardsSeen: (ids) => ipcRenderer.invoke('rewards:markSeen', ids),

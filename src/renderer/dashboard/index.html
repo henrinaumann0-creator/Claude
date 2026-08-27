@@ -23,20 +23,36 @@
 
     <nav class="nav">
       <button class="nav-item is-active" data-view="home">
-        <span class="nav-ico">🏠</span> Übersicht
+        <span class="nav-ico" data-icon="home"></span>
+        <span class="nav-text">Übersicht</span>
+        <span class="nav-text nav-text--short">Start</span>
       </button>
       <button class="nav-item" data-view="rewards">
-        <span class="nav-ico">🎁</span> Belohnungen
+        <span class="nav-ico" data-icon="gift"></span>
+        <span class="nav-text">Belohnungen</span>
+        <span class="nav-text nav-text--short">Preise</span>
         <span class="nav-badge" id="navBadge" hidden>0</span>
       </button>
+      <button class="nav-item" data-view="achievements">
+        <span class="nav-ico" data-icon="trophy"></span>
+        <span class="nav-text">Erfolge</span>
+        <span class="nav-text nav-text--short">Erfolge</span>
+        <span class="nav-badge" id="achBadge" hidden>0</span>
+      </button>
       <button class="nav-item" data-view="wardrobe">
-        <span class="nav-ico">✨</span> Ausstattung
+        <span class="nav-ico" data-icon="wardrobe"></span>
+        <span class="nav-text">Ausstattung</span>
+        <span class="nav-text nav-text--short">Outfit</span>
       </button>
       <button class="nav-item" data-view="stats">
-        <span class="nav-ico">📈</span> Statistik
+        <span class="nav-ico" data-icon="chart"></span>
+        <span class="nav-text">Statistik</span>
+        <span class="nav-text nav-text--short">Zahlen</span>
       </button>
       <button class="nav-item" data-view="settings">
-        <span class="nav-ico">⚙️</span> Einstellungen
+        <span class="nav-ico" data-icon="gear"></span>
+        <span class="nav-text">Einstellungen</span>
+        <span class="nav-text nav-text--short">Mehr</span>
       </button>
     </nav>
 
@@ -62,12 +78,12 @@
           <p class="sub">Alles über <span id="headName">Nova</span> auf einen Blick.</p>
         </div>
         <div class="streak-chip" id="streakChip" title="Tage in Folge">
-          <span class="flame">🔥</span> <strong id="streakVal">0</strong> Tage
+          <span class="flame" data-icon="flame"></span> <strong id="streakVal">0</strong> Tage
         </div>
       </header>
 
       <div class="hero">
-        <div class="hero-stage">
+        <div class="hero-stage" id="petYard">
           <div class="hero-glow"></div>
           <div class="hero-pet" id="heroPet"></div>
           <div class="hero-floor"></div>
@@ -94,16 +110,16 @@
               <div class="meter meter--sm"><i id="hungerBar" class="bar--food" style="width:100%"></i></div>
             </div>
             <div class="gauge">
-              <div class="gauge-top"><span>Gesamt-XP</span><b id="totalXp">0</b></div>
-              <div class="meter meter--sm"><i class="bar--muted" style="width:100%"></i></div>
+              <div class="gauge-top"><span>Erfolge</span><b id="achMini">0 / 29</b></div>
+              <div class="meter meter--sm"><i id="achBar" class="bar--gold" style="width:0%"></i></div>
             </div>
           </div>
 
           <div class="actions">
-            <button class="btn btn--primary" id="btnFeed"><span>🍎</span> Füttern</button>
-            <button class="btn" id="btnPlay"><span>🎾</span> Spielen</button>
-            <button class="btn" id="btnWalk"><span>🐾</span> Spazieren</button>
-            <button class="btn" id="btnThought"><span>💭</span> Gedanke</button>
+            <button class="btn btn--primary" id="btnFeed"><span data-icon="apple" data-tone="cream"></span> Füttern</button>
+            <button class="btn" id="btnPlay"><span data-icon="ball"></span> Spielen</button>
+            <button class="btn" id="btnWalk"><span data-icon="paw"></span> Spazieren</button>
+            <button class="btn" id="btnThought"><span data-icon="bubble"></span> Gedanke</button>
           </div>
         </div>
       </div>
@@ -129,6 +145,27 @@
         </div>
       </header>
       <div class="road" id="road"></div>
+    </section>
+
+    <!-- ===== Erfolge ===== -->
+    <section class="view" data-view="achievements">
+      <header class="view-head">
+        <div>
+          <h1>Erfolge</h1>
+          <p class="sub" id="achSub">Sammle Abzeichen für alles, was ihr zusammen erlebt.</p>
+        </div>
+        <div class="filters" id="achFilters">
+          <button class="chip is-active" data-filter="all">Alle</button>
+          <button class="chip" data-filter="open">Offen</button>
+          <button class="chip" data-filter="done">Geschafft</button>
+          <button class="chip" data-filter="bronze">Bronze</button>
+          <button class="chip" data-filter="silver">Silber</button>
+          <button class="chip" data-filter="gold">Gold</button>
+        </div>
+      </header>
+
+      <div class="tier-row" id="tierRow"></div>
+      <div class="ach-grid" id="achGrid"></div>
     </section>
 
     <!-- ===== Ausstattung ===== -->
@@ -213,28 +250,31 @@
         <p class="panel-note">Dein Fortschritt liegt auf jedem Gerät für sich. Mit einem Code
           nimmst du ihn mit – vom Desktop aufs Handy und zurück.</p>
         <div class="transfer">
-          <button class="btn" id="btnExport"><span>📤</span> Code erzeugen</button>
+          <button class="btn" id="btnExport"><span data-icon="upload"></span> Code erzeugen</button>
           <textarea id="saveCode" class="code-box" rows="3" spellcheck="false"
                     placeholder="Code hier einfügen und einspielen …"></textarea>
-          <button class="btn btn--primary" id="btnImport"><span>📥</span> Einspielen</button>
+          <button class="btn btn--primary" id="btnImport"><span data-icon="download" data-tone="cream"></span> Einspielen</button>
         </div>
       </div>
 
       <div class="panel panel--danger">
         <div class="danger-row">
-          <span><strong>Fortschritt zurücksetzen</strong><small>Level, XP und Belohnungen gehen verloren.</small></span>
+          <span><strong>Fortschritt zurücksetzen</strong><small>Level, XP, Erfolge und Belohnungen gehen verloren.</small></span>
           <button class="btn btn--danger" id="btnReset">Zurücksetzen</button>
         </div>
       </div>
 
-      <p class="foot">Claude Pets · v1.0.0 · Rechtsklick auf das Pet öffnet das Schnellmenü.</p>
+      <p class="foot">Claude Pets · v1.1.0 · Rechtsklick auf das Pet öffnet das Schnellmenü.</p>
     </section>
   </main>
 </div>
 
 <div id="snack" class="snackbar" hidden></div>
 
+<script src="../../shared/pixel.js"></script>
+<script src="../../shared/icons.js"></script>
 <script src="../../shared/progression.js"></script>
+<script src="../../shared/achievements.js"></script>
 <script src="../../shared/thoughts.js"></script>
 <script src="../pet/pets.js"></script>
 <script src="dashboard.js"></script>

@@ -1,7 +1,7 @@
 {
   "name": "claude-pets",
   "productName": "Claude Pets",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Ein animierter Desktop-Begleiter mit Level-System, Belohnungen und Gedankenblasen – im Claude-Look.",
   "main": "src/main/main.js",
   "author": "Henri Naumann",

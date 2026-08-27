@@ -6,9 +6,12 @@
 (() => {
   const $ = (id) => document.getElementById(id);
   const P = window.Progression;
+  const A = window.Achievements;
+  const I = window.Icons;
 
   let snap = null;
   let filter = 'all';
+  let achFilter = 'all';
 
   /* ---------------------------------------------------------
      Hilfen
@@ -25,13 +28,19 @@
     if (reward.type === 'accessory') {
       return PetArt.build({ pet: eq.pet || 'nova', palette: eq.palette, accessory: reward.id, static: true });
     }
-    return `<span>${P.TYPE_META[reward.type].icon}</span>`;
+    return `<span class="type-ico">${I.build(P.TYPE_META[reward.type].icon, { size: 30 })}</span>`;
   }
 
+  const typeTag = (type) => {
+    const meta = P.TYPE_META[type];
+    return `<span class="road-tag">${I.build(meta.icon, { size: 11 })}${meta.label}</span>`;
+  };
+
   let snackTimer = null;
-  function snack(text) {
+  function snack(text, icon, tone) {
     const s = $('snack');
-    s.textContent = text;
+    s.innerHTML = (icon ? `<span class="snack-ico">${I.build(icon, { tone: tone || 'gold', size: 18 })}</span>` : '')
+      + `<span>${text}</span>`;
     s.hidden = false;
     s.classList.remove('is-leaving');
     clearTimeout(snackTimer);
@@ -52,6 +61,7 @@
       const target = btn.dataset.view;
       document.querySelectorAll('.view').forEach((v) => v.classList.toggle('is-active', v.dataset.view === target));
       if (target === 'rewards') markRewardsSeen();
+      if (target === 'achievements') markAchievementsSeen();
     });
   });
 
@@ -80,7 +90,6 @@
 
     $('hungerVal').textContent = snap.hunger + ' %';
     $('hungerBar').style.width = snap.hunger + '%';
-    $('totalXp').textContent = fmt(snap.totalXp);
 
     $('heroPet').innerHTML = PetArt.build({
       pet: snap.state.equipped.pet,
@@ -101,7 +110,8 @@
       card('Spaziergänge', fmt(snap.state.stats.walks), 'quer über den Bildschirm'),
       card('Gemeinsame Zeit', `${fmt(snap.state.stats.minutes)} Min.`, 'passiv gesammelt'),
       card('Beste Serie', `${snap.state.bestStreak || 0} Tage`, 'am Stück besucht'),
-      card('Level-Ups', fmt(snap.state.stats.levelUps || 0), 'bisher gefeiert')
+      card('Level-Ups', fmt(snap.state.stats.levelUps || 0), 'bisher gefeiert'),
+      card('Erfolge', `${snap.achievements.done} / ${snap.achievements.total}`, `${fmt(snap.achievements.points)} Bonus-XP`)
     ].join('');
 
     $('toggleVisible').textContent = snap.state.settings.visible ? 'Pet verstecken' : 'Pet anzeigen';
@@ -144,10 +154,10 @@
         <div class="road-main">
           <strong>${r.name}${r.sub ? ` <span class="muted">· ${r.sub}</span>` : ''}</strong>
           <small>${r.desc}</small>
-          <span class="road-tag">${P.TYPE_META[r.type].icon} ${P.TYPE_META[r.type].label}</span>
+          ${typeTag(r.type)}
         </div>
         <div class="road-side">
-          <span class="road-lvl">${unlocked ? '' : '<span class="lock">🔒</span> '}Level <b>${r.level}</b></span>
+          <span class="road-lvl">${unlocked ? '' : `<span class="lock">${I.build('lock', { tone: 'muted', size: 12 })}</span>`}Level <b>${r.level}</b></span>
           ${unlocked && equippable
             ? `<button class="mini-btn ${active ? 'is-on' : ''}" data-equip="${slot}" data-id="${r.id}">${active ? 'Aktiv' : 'Anlegen'}</button>`
             : ''}
@@ -174,6 +184,13 @@
     render();
     snack(isActive && slot !== 'pet' ? 'Abgelegt.' : 'Angelegt!');
   });
+
+  function markAchievementsSeen() {
+    const unseen = (snap.state.achievements || [])
+      .map((id) => 'ach:' + id)
+      .filter((id) => !(snap.state.seenRewards || []).includes(id));
+    if (unseen.length) window.pets.markRewardsSeen(unseen).then((s) => { snap = s; render(); });
+  }
 
   function markRewardsSeen() {
     const unseen = snap.unlockedIds.filter((id) => !(snap.state.seenRewards || []).includes(id));
@@ -203,7 +220,7 @@
 
     if (allowNone) {
       html += `<button class="opt ${!cur ? 'is-on' : ''}" data-slot="${slotName}" data-id="">
-        <span class="opt-art">🚫</span><span>Ohne</span></button>`;
+        <span class="opt-art">${I.build('ban', { size: 40 })}</span><span>Ohne</span></button>`;
     }
 
     html += rewards.map((r) => {
@@ -212,7 +229,7 @@
               ${unlocked ? '' : 'disabled'} data-slot="${slotName}" data-id="${r.id}" title="${r.desc}">
         <span class="opt-art">${art(r)}</span>
         <span>${r.name}</span>
-        ${unlocked ? '' : `<span class="opt-lock">🔒 Level ${r.level}</span>`}
+        ${unlocked ? '' : `<span class="opt-lock">${I.build('lock', { tone: 'muted', size: 10 })} Level ${r.level}</span>`}
       </button>`;
     }).join('');
 
@@ -224,6 +241,75 @@
     if (!btn || btn.disabled) return;
     snap = await window.pets.equip(btn.dataset.slot, btn.dataset.id || null);
     render();
+  });
+
+  /* ---------------------------------------------------------
+     Erfolge
+     --------------------------------------------------------- */
+  function renderAchievements() {
+    const sum = snap.achievements;
+    const have = new Set(snap.state.achievements || []);
+
+    $('achSub').textContent =
+      `${sum.done} von ${sum.total} Abzeichen · ${fmt(sum.points)} Bonus-XP gesammelt.`;
+    $('achMini').textContent = `${sum.done} / ${sum.total}`;
+    $('achBar').style.width = (sum.total ? (sum.done / sum.total) * 100 : 0) + '%';
+
+    $('tierRow').innerHTML = ['bronze', 'silver', 'gold'].map((tier) => {
+      const meta = A.TIERS[tier];
+      const total = A.ACHIEVEMENTS.filter((a) => a.tier === tier).length;
+      const done = sum.perTier[tier];
+      return `<div class="tier-card tier-card--${tier}">
+        <span class="tier-ico">${I.build('medal', { tone: meta.tone, size: 34 })}</span>
+        <span class="tier-body">
+          <strong>${meta.label}</strong>
+          <small>${done} / ${total} · je ${meta.xp} XP</small>
+        </span>
+        <span class="tier-ring" style="--p:${total ? (done / total) * 100 : 0}%"></span>
+      </div>`;
+    }).join('');
+
+    const list = A.sorted(snap.state, snap.level).filter((a) => {
+      const done = have.has(a.id);
+      if (achFilter === 'open') return !done;
+      if (achFilter === 'done') return done;
+      if (['bronze', 'silver', 'gold'].includes(achFilter)) return a.tier === achFilter;
+      return true;
+    });
+
+    $('achGrid').innerHTML = list.map((a, i) => {
+      const done = have.has(a.id);
+      const pr = A.progressOf(a, snap.state, snap.level);
+      const meta = A.TIERS[a.tier];
+      const pct = Math.round(pr.ratio * 100);
+      return `<article class="ach ${done ? 'is-done' : ''} ach--${a.tier}"
+                       style="animation-delay:${Math.min(i * 20, 380)}ms">
+        <div class="ach-badge">
+          ${I.build(a.icon, { tone: done ? meta.tone : 'muted', size: 38 })}
+          ${done ? `<span class="ach-check">${I.build('check', { tone: 'cream', size: 12 })}</span>` : ''}
+        </div>
+        <div class="ach-main">
+          <strong>${a.name}</strong>
+          <small>${a.desc}</small>
+          <div class="ach-progress">
+            <div class="meter meter--sm"><i class="bar--${a.tier}" style="width:${pct}%"></i></div>
+            <span class="ach-count">${fmt(pr.current)} / ${fmt(pr.goal)}${a.unit ? ' ' + a.unit : ''}</span>
+          </div>
+        </div>
+        <div class="ach-side">
+          <span class="ach-tier">${meta.label}</span>
+          <span class="ach-xp">+${meta.xp} XP</span>
+        </div>
+      </article>`;
+    }).join('') || '<p class="empty">Hier ist gerade nichts – probier einen anderen Filter.</p>';
+  }
+
+  $('achFilters').addEventListener('click', (e) => {
+    const chip = e.target.closest('.chip');
+    if (!chip) return;
+    achFilter = chip.dataset.filter;
+    document.querySelectorAll('#achFilters .chip').forEach((c) => c.classList.toggle('is-active', c === chip));
+    renderAchievements();
   });
 
   /* ---------------------------------------------------------
@@ -239,7 +325,10 @@
       card('Snacks', fmt(s.feeds), `${fmt(s.feeds * P.XP_EVENTS.feed.amount)} XP`),
       card('Spielrunden', fmt(s.plays), `${fmt(s.plays * P.XP_EVENTS.play.amount)} XP`),
       card('Zeit zusammen', `${fmt(s.minutes)} Min.`, `${fmt(s.minutes * P.XP_EVENTS.idle.amount)} XP`),
-      card('Level-Ups', fmt(s.levelUps || 0), `Beste Serie: ${snap.state.bestStreak || 0} Tage`)
+      card('Level-Ups', fmt(s.levelUps || 0), `Beste Serie: ${snap.state.bestStreak || 0} Tage`),
+      card('Getragen', fmt(s.drags || 0), 'an eine andere Stelle gesetzt'),
+      card('Laufstrecke', `${fmt(Math.round((s.distance || 0) / 1000))} k`, 'Pixel zurückgelegt'),
+      card('Abzeichen', `${snap.achievements.done} / ${snap.achievements.total}`, `${fmt(snap.achievements.points)} Bonus-XP`)
     ].join('');
 
     const rows = [
@@ -368,18 +457,30 @@
     if (!snap) return;
     renderHome();
     renderRoad();
+    renderAchievements();
     renderWardrobe();
     renderStats();
     renderSettings();
+    I.hydrate(document);
+
+    const unseenAch = (snap.state.achievements || [])
+      .filter((id) => !(snap.state.seenRewards || []).includes('ach:' + id)).length;
+    $('achBadge').hidden = unseenAch === 0;
+    $('achBadge').textContent = unseenAch;
   }
 
   window.pets.onState((s) => {
     const leveled = s.levelUp;
+    const earned = s.achievementsUnlocked;
     snap = s;
     render();
     if (leveled) {
       const list = leveled.rewards.map((r) => r.name).join(', ');
       snack(`Level ${leveled.to}!${list ? ' ' + list + ' freigeschaltet.' : ''}`);
+    }
+    if (earned && earned.length) {
+      const names = earned.map((a) => a.name).join(', ');
+      snack(`Erfolg freigeschaltet: ${names}`, earned[0].icon, A.TIERS[earned[0].tier].tone);
     }
   });
 

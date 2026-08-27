@@ -5,10 +5,13 @@
    Animationen laufen als echte Frame-Wechsel (steps()).
    ============================================================ */
 (function (root, factory) {
-  const api = factory();
+  const Pixel = (typeof module === 'object' && module.exports)
+    ? require('../../shared/pixel.js')
+    : root.Pixel;
+  const api = factory(Pixel);
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.PetArt = api;
-})(typeof self !== 'undefined' ? self : this, function () {
+})(typeof self !== 'undefined' ? self : this, function (Pixel) {
   'use strict';
 
   const W = 32, H = 32;
@@ -19,120 +22,61 @@
      6 Innenfarbe · 7 Auge · 8 Weiß · 9 Akzent · 0 Metall
      --------------------------------------------------------- */
   const PALETTES = {
-    amber:    { name: 'Amber',       1:'#7A3A25', 2:'#D97757', 3:'#EFA47F', 4:'#B25A3D', 5:'#F7E6D9', 6:'#F3BBA2', 7:'#2E211B', 8:'#FFFFFF', 9:'#F0A93C', 0:'#C9C3B6' },
-    sunset:   { name: 'Sunset',      1:'#6B2A1D', 2:'#C4553F', 3:'#E4805F', 4:'#8C3728', 5:'#F7DDCC', 6:'#EDA88F', 7:'#2A1712', 8:'#FFFFFF', 9:'#F2C14E', 0:'#C4B7A6' },
-    mint:     { name: 'Mint',        1:'#33564A', 2:'#7FB09B', 3:'#A9CFBC', 4:'#537F6D', 5:'#E9F3EE', 6:'#BFE2D0', 7:'#20302A', 8:'#FFFFFF', 9:'#EFC169', 0:'#C2CBC6' },
-    lavender: { name: 'Lavendel',    1:'#463A63', 2:'#9A8BC0', 3:'#BEB1DC', 4:'#6D5F93', 5:'#EFEAF8', 6:'#CFC2E8', 7:'#28213A', 8:'#FFFFFF', 9:'#F0BE63', 0:'#C5C1CF' },
-    midnight: { name: 'Mitternacht', 1:'#1B2138', 2:'#46527A', 3:'#6F7EAC', 4:'#2B3352', 5:'#DBE1F1', 6:'#8493C4', 7:'#12162A', 8:'#FFFFFF', 9:'#F2CE72', 0:'#AEB6C9' },
-    coral:    { name: 'Koralle',     1:'#8A3A32', 2:'#EA7A6D', 3:'#F9A597', 4:'#C0544A', 5:'#FCE5E0', 6:'#F9B8AB', 7:'#3A211E', 8:'#FFFFFF', 9:'#F6C05C', 0:'#D2C6C3' }
+    amber:    { name: 'Amber',       1:'#7A3A25', A:'#99492F', 2:'#D97757', 3:'#EFA47F', 4:'#B25A3D', 5:'#F7E6D9', 6:'#F3BBA2', 7:'#2E211B', 8:'#FFFFFF', 9:'#F0A93C', 0:'#C9C3B6' },
+    sunset:   { name: 'Sunset',      1:'#6B2A1D', A:'#7E3325', 2:'#C4553F', 3:'#E4805F', 4:'#8C3728', 5:'#F7DDCC', 6:'#EDA88F', 7:'#2A1712', 8:'#FFFFFF', 9:'#F2C14E', 0:'#C4B7A6' },
+    mint:     { name: 'Mint',        1:'#33564A', A:'#446B5B', 2:'#7FB09B', 3:'#A9CFBC', 4:'#537F6D', 5:'#E9F3EE', 6:'#BFE2D0', 7:'#20302A', 8:'#FFFFFF', 9:'#EFC169', 0:'#C2CBC6' },
+    lavender: { name: 'Lavendel',    1:'#463A63', A:'#5A4C7C', 2:'#9A8BC0', 3:'#BEB1DC', 4:'#6D5F93', 5:'#EFEAF8', 6:'#CFC2E8', 7:'#28213A', 8:'#FFFFFF', 9:'#F0BE63', 0:'#C5C1CF' },
+    midnight: { name: 'Mitternacht', 1:'#1B2138', A:'#23293F', 2:'#46527A', 3:'#6F7EAC', 4:'#2B3352', 5:'#DBE1F1', 6:'#8493C4', 7:'#12162A', 8:'#FFFFFF', 9:'#F2CE72', 0:'#AEB6C9' },
+    coral:    { name: 'Koralle',     1:'#8A3A32', A:'#A5453A', 2:'#EA7A6D', 3:'#F9A597', 4:'#C0544A', 5:'#FCE5E0', 6:'#F9B8AB', 7:'#3A211E', 8:'#FFFFFF', 9:'#F6C05C', 0:'#D2C6C3' }
   };
 
   /* ---------------------------------------------------------
-     Pixel-Leinwand
+     Leinwand aus dem gemeinsamen Pixel-Modul
      --------------------------------------------------------- */
-  function Canvas() {
-    this.g = new Array(W * H).fill('.');
-  }
-  Canvas.prototype.at = function (x, y) {
-    if (x < 0 || y < 0 || x >= W || y >= H) return '.';
-    return this.g[y * W + x];
-  };
-  Canvas.prototype.set = function (x, y, ch) {
-    x = Math.round(x); y = Math.round(y);
-    if (x < 0 || y < 0 || x >= W || y >= H || !ch) return;
-    this.g[y * W + x] = ch;
-  };
-  /** Setzt nur, wenn dort schon etwas gezeichnet ist (für Details auf dem Körper). */
-  Canvas.prototype.over = function (x, y, ch) {
-    if (this.at(x, y) === '.') return;
-    this.set(x, y, ch);
-  };
-  Canvas.prototype.rect = function (x, y, w, h, ch) {
-    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) this.set(x + i, y + j, ch);
-  };
-  Canvas.prototype.ell = function (cx, cy, rx, ry, ch, onlyOver) {
-    const x0 = Math.floor(cx - rx), x1 = Math.ceil(cx + rx);
-    const y0 = Math.floor(cy - ry), y1 = Math.ceil(cy + ry);
-    for (let y = y0; y <= y1; y++) {
-      for (let x = x0; x <= x1; x++) {
-        const dx = (x + 0.5 - cx) / (rx + 0.5);
-        const dy = (y + 0.5 - cy) / (ry + 0.5);
-        if (dx * dx + dy * dy <= 1) onlyOver ? this.over(x, y, ch) : this.set(x, y, ch);
-      }
-    }
-  };
-  Canvas.prototype.tri = function (p1, p2, p3, ch) {
-    const minX = Math.floor(Math.min(p1[0], p2[0], p3[0]));
-    const maxX = Math.ceil(Math.max(p1[0], p2[0], p3[0]));
-    const minY = Math.floor(Math.min(p1[1], p2[1], p3[1]));
-    const maxY = Math.ceil(Math.max(p1[1], p2[1], p3[1]));
-    const area = (a, b, c) => (b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1]);
-    const A = area(p1, p2, p3);
-    for (let y = minY; y <= maxY; y++) {
-      for (let x = minX; x <= maxX; x++) {
-        const p = [x + 0.5, y + 0.5];
-        const w1 = area(p1, p2, p) / A, w2 = area(p2, p3, p) / A, w3 = area(p3, p1, p) / A;
-        if (w1 >= -0.02 && w2 >= -0.02 && w3 >= -0.02) this.set(x, y, ch);
-      }
-    }
-  };
-  /** Spiegelt die linke Hälfte auf die rechte (perfekte Symmetrie). */
-  Canvas.prototype.mirror = function () {
-    for (let y = 0; y < H; y++)
-      for (let x = 0; x < W / 2; x++)
-        this.g[y * W + (W - 1 - x)] = this.g[y * W + x];
-  };
-  /** Legt eine 1px-Kontur nach außen um alle gefüllten Pixel. */
-  Canvas.prototype.outline = function () {
-    const copy = this.g.slice();
-    const filled = (x, y) => {
-      if (x < 0 || y < 0 || x >= W || y >= H) return false;
-      return copy[y * W + x] !== '.';
-    };
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
-        if (filled(x, y)) continue;
-        if (filled(x - 1, y) || filled(x + 1, y) || filled(x, y - 1) || filled(x, y + 1)) {
-          this.g[y * W + x] = '1';
-        }
-      }
-    }
-  };
-  /** Automatische Licht/Schatten-Kanten auf dem Fell. */
-  Canvas.prototype.shade = function () {
-    const copy = this.g.slice();
+  const Canvas = Pixel.Canvas;
+
+  /**
+   * Oben liegende Konturpixel werden aufgehellt. Das ist der klassische
+   * Pixel-Art-Kniff "selective outlining": Licht faellt von oben ein,
+   * die Silhouette wirkt dadurch runder statt wie ausgeschnitten.
+   */
+  function softenOutline(c) {
+    const copy = c.g.slice();
     const get = (x, y) => (x < 0 || y < 0 || x >= W || y >= H) ? '.' : copy[y * W + x];
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
-        if (get(x, y) !== '2') continue;
-        const up = get(x, y - 1), up2 = get(x, y - 2), down = get(x, y + 1);
-        if ((up === '1' || up === '.') && x < W - 8) this.set(x, y, '3');
-        else if (up2 === '1' && x < 20 && y < 14) this.set(x, y, '3');
-        else if (down === '1' || down === '.') this.set(x, y, '4');
+        if (get(x, y) !== '1') continue;
+        const above = get(x, y - 1);
+        const below = get(x, y + 1);
+        if (above === '.' && below !== '.' && below !== '1') c.set(x, y, 'A');
       }
     }
-  };
-  Canvas.prototype.eyes = function (p, pose) {
+  }
+
+  /** Augen inkl. Lidschluss und Freude-Bogen. */
+  function drawEyes(c, p, pose) {
     const { lx, y, w = 2, h = 3 } = p;
     const rx = W - lx - w;
     if (pose.eyes === 'closed') {
       for (let i = -1; i <= w; i++) {
-        this.over(lx + i, y + 1, '1');
-        this.over(rx + i, y + 1, '1');
+        c.over(lx + i, y + 1, '1');
+        c.over(rx + i, y + 1, '1');
       }
       return;
     }
     if (pose.eyes === 'happy') {
-      // ^ ^
-      this.over(lx, y + 1, '1'); this.over(lx + 1, y, '1'); this.over(lx + 2, y + 1, '1');
-      this.over(rx - 1, y + 1, '1'); this.over(rx, y, '1'); this.over(rx + 1, y + 1, '1');
+      c.over(lx, y + 1, '1'); c.over(lx + 1, y, '1'); c.over(lx + 2, y + 1, '1');
+      c.over(rx - 1, y + 1, '1'); c.over(rx, y, '1'); c.over(rx + 1, y + 1, '1');
       return;
     }
-    this.rect(lx, y, w, h, '7');
-    this.rect(rx, y, w, h, '7');
-    this.set(lx, y, '8');
-    this.set(rx, y, '8');
-  };
+    c.rect(lx, y, w, h, '7');
+    c.rect(rx, y, w, h, '7');
+    c.set(lx, y, '8');
+    c.set(rx, y, '8');
+    // Unterer Rand etwas heller – gibt dem Auge Tiefe
+    c.set(lx + w - 1, y + h - 1, '6');
+    c.set(rx + w - 1, y + h - 1, '6');
+  }
 
   /* ---------------------------------------------------------
      Charaktere – silhouette() zeichnet den Umriss in '2',
@@ -165,7 +109,8 @@
         c.ell(21.5, 5 + b, 2, 2.5, '6', true);
         c.ell(15.5, 24 + b, 4, 3.5, '5', true);   // Bauch
         c.ell(15.5, 15 + b, 4, 2, '5', true);     // Schnauze
-        c.eyes({ lx: 10, y: 10 + b }, p);
+        drawEyes(c, { lx: 10, y: 10 + b }, p);
+        blush(c, 13 + b, 8);
         c.over(15, 14 + b, '1'); c.over(16, 14 + b, '1');
         c.over(15, 15 + b, '1'); c.over(16, 15 + b, '1');
         c.over(14, 16 + b, '1'); c.over(17, 16 + b, '1');
@@ -196,7 +141,8 @@
         c.ell(20.5, 6 + b, 1.5, 2, '6', true);
         c.ell(15.5, 24 + b, 3.5, 3.5, '5', true);
         c.ell(15.5, 15 + b, 4.5, 2, '5', true);
-        c.eyes({ lx: 10, y: 10 + b }, p);
+        drawEyes(c, { lx: 10, y: 10 + b }, p);
+        blush(c, 13 + b, 8);
         c.over(15, 14 + b, '9'); c.over(16, 14 + b, '9');
         c.over(15, 15 + b, '1'); c.over(16, 15 + b, '1');
         c.over(13, 16 + b, '1'); c.over(18, 16 + b, '1');
@@ -222,7 +168,8 @@
       details(c, p) {
         const b = p.bob;
         c.ell(15.5, 22 + b, 7.5, 5, '5', true);
-        c.eyes({ lx: 10, y: 15 + b, w: 3, h: 4 }, p);
+        drawEyes(c, { lx: 10, y: 15 + b, w: 3, h: 4 }, p);
+        blush(c, 20 + b, 6);
         c.over(14, 21 + b, '1'); c.over(15, 22 + b, '1');
         c.over(16, 22 + b, '1'); c.over(17, 21 + b, '1');
         c.ell(7.5, 19 + b, 1.5, 1, '6', true);
@@ -284,7 +231,8 @@
       details(c, p) {
         const b = p.bob;
         c.ell(15.5, 18 + b, 6.5, 8.5, '5', true);
-        c.eyes({ lx: 11, y: 11 + b }, p);
+        drawEyes(c, { lx: 11, y: 11 + b }, p);
+        blush(c, 14 + b, 9);
         c.rect(14, 15 + b, 4, 2, '9');
         c.rect(15, 17 + b, 2, 1, '9');
         c.ell(11, 27, 3, 1.5, '9', true);
@@ -315,7 +263,8 @@
         c.ell(15.5, 24 + b, 4.5, 3.5, '5', true);
         c.rect(14, 20 + b, 4, 1, '5'); c.rect(13, 22 + b, 6, 1, '5');
         c.ell(15.5, 15 + b, 4.5, 2, '5', true);
-        c.eyes({ lx: 10, y: 10 + b }, p);
+        drawEyes(c, { lx: 10, y: 10 + b }, p);
+        blush(c, 13 + b, 8);
         c.over(14, 14 + b, '1'); c.over(17, 14 + b, '1');
         c.over(13, 16 + b, '1'); c.over(14, 17 + b, '1');
         c.over(17, 17 + b, '1'); c.over(18, 16 + b, '1');
@@ -330,6 +279,15 @@
       }
     }
   };
+
+  /** Zarte Wangen links und rechts vom Gesicht. */
+  function blush(c, y, inset) {
+    const x = inset === undefined ? 8 : inset;
+    c.over(x, y, '6'); c.over(x + 1, y, '6');
+    c.over(W - x - 2, y, '6'); c.over(W - x - 1, y, '6');
+    c.over(x, y + 1, '6');
+    c.over(W - x - 1, y + 1, '6');
+  }
 
   /** Vier Beine im Laufzyklus (Frames 0-3). */
   function legsQuad(c, p) {
@@ -412,32 +370,15 @@
     }
   };
 
-  /* ---------------------------------------------------------
-     Raster → SVG (horizontale Läufe zusammenfassen)
-     --------------------------------------------------------- */
-  function toSvg(grid, colors, cls) {
-    let out = '';
-    for (let y = 0; y < H; y++) {
-      let x = 0;
-      while (x < W) {
-        const ch = grid[y * W + x];
-        if (ch === '.') { x++; continue; }
-        let len = 1;
-        while (x + len < W && grid[y * W + x + len] === ch) len++;
-        const fill = colors[ch] || colors[2];
-        out += `<rect x="${x}" y="${y}" width="${len}" height="1" fill="${fill}"/>`;
-        x += len;
-      }
-    }
-    return `<g class="${cls}">${out}</g>`;
-  }
+  const toSvg = (grid, colors, cls) => Pixel.toSvg(grid, W, H, colors, cls);
 
   /** Einen kompletten Frame rendern. */
   function frame(petId, pose, colors, accessory) {
     const pet = PETS[petId];
-    const c = new Canvas();
+    const c = new Canvas(W, H);
     pet.silhouette(c, pose);
     c.outline();
+    softenOutline(c);
     c.shade();
     pet.details(c, pose);
     if (accessory && ACCESSORIES[accessory]) {

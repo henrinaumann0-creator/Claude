@@ -34,7 +34,10 @@ fs.mkdirSync(path.join(OUT, 'icons'), { recursive: true });
 /* Geteilte Skripte und Stile */
 const LIB = [
   ['src/shared/theme.css', 'lib/theme.css'],
+  ['src/shared/pixel.js', 'lib/pixel.js'],
+  ['src/shared/icons.js', 'lib/icons.js'],
   ['src/shared/progression.js', 'lib/progression.js'],
+  ['src/shared/achievements.js', 'lib/achievements.js'],
   ['src/shared/thoughts.js', 'lib/thoughts.js'],
   ['src/renderer/pet/pets.js', 'lib/pets.js'],
   ['src/renderer/pet/pet.js', 'lib/pet.js'],

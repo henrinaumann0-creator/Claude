@@ -46,20 +46,20 @@
       </div>
       <div class="menu-bar"><i id="menuBar" style="width:0%"></i></div>
       <button class="menu-item" data-action="walk">
-        <span class="menu-icon">🐾</span> Spazieren gehen
+        <span class="menu-icon" data-icon="paw"></span> Spazieren gehen
       </button>
       <button class="menu-item" data-action="thought">
-        <span class="menu-icon">💭</span> Neuer Gedanke
+        <span class="menu-icon" data-icon="bubble"></span> Neuer Gedanke
       </button>
       <button class="menu-item" data-action="sleep">
-        <span class="menu-icon">😴</span> Schlafen legen
+        <span class="menu-icon" data-icon="moon"></span> Schlafen legen
       </button>
       <button class="menu-item" data-action="dashboard">
-        <span class="menu-icon">📊</span> Dashboard öffnen
+        <span class="menu-icon" data-icon="chart"></span> Dashboard öffnen
       </button>
       <div class="menu-sep"></div>
       <button class="menu-item menu-item--danger" data-action="remove">
-        <span class="menu-icon">✕</span> Pet entfernen
+        <span class="menu-icon" data-icon="close"></span> Pet entfernen
       </button>
     </div>
 
@@ -73,10 +73,24 @@
       </div>
     </div>
 
+    <!-- Erfolgs-Banner -->
+    <div id="achToast" class="toast toast--ach" hidden>
+      <div class="toast-glow"></div>
+      <div class="toast-badge toast-badge--ach" id="achIcon"></div>
+      <div class="toast-body">
+        <small id="achTier">Bronze-Erfolg</small>
+        <strong id="achTitle">Erste Berührung</strong>
+        <span id="achText">+25 XP</span>
+      </div>
+    </div>
+
     <div id="confetti" class="confetti-layer" aria-hidden="true"></div>
   </div>
 
+  <script src="../../shared/pixel.js"></script>
+  <script src="../../shared/icons.js"></script>
   <script src="../../shared/progression.js"></script>
+  <script src="../../shared/achievements.js"></script>
   <script src="../../shared/thoughts.js"></script>
   <script src="pets.js"></script>
   <script src="pet.js"></script>

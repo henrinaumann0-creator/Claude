@@ -108,13 +108,14 @@
     { id: 'legend',      type: 'perk', level: 50, name: 'Legendär',        desc: 'Maximales Level. Dein Pet trägt einen Sternenmantel.' }
   ];
 
+  /* icon verweist auf ein Symbol aus shared/icons.js */
   const TYPE_META = {
-    pet:       { label: 'Pet',        icon: '🐾' },
-    accessory: { label: 'Accessoire', icon: '🎀' },
-    palette:   { label: 'Farbe',      icon: '🎨' },
-    thoughts:  { label: 'Gedanken',   icon: '💭' },
-    effect:    { label: 'Effekt',     icon: '✨' },
-    perk:      { label: 'Fähigkeit',  icon: '⭐' }
+    pet:       { label: 'Pet',        icon: 'paw' },
+    accessory: { label: 'Accessoire', icon: 'bow' },
+    palette:   { label: 'Farbe',      icon: 'palette' },
+    thoughts:  { label: 'Gedanken',   icon: 'bubble' },
+    effect:    { label: 'Effekt',     icon: 'sparkles' },
+    perk:      { label: 'Fähigkeit',  icon: 'star' }
   };
 
   const byId = (id) => REWARDS.find((r) => r.id === id) || null;

@@ -436,5 +436,32 @@ html, body {
 .menu-avatar .px-f,
 .px-static .px-f { opacity: 1; }
 
+/* ------------------------------------------------------------
+   Eigene Pixel-Symbole
+   ------------------------------------------------------------ */
+.pxi { display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
+.menu-icon { display: inline-flex; align-items: center; justify-content: center; }
+.menu-icon .pxi { width: 16px; height: 16px; }
+
+/* ------------------------------------------------------------
+   Erfolgs-Banner
+   ------------------------------------------------------------ */
+.toast--ach { box-shadow: var(--sh-3), 0 6px 26px rgba(232,180,74,.30); }
+.toast--ach[data-tier="silver"] { box-shadow: var(--sh-3), 0 6px 26px rgba(141,148,158,.32); }
+.toast--ach[data-tier="bronze"] { box-shadow: var(--sh-3), 0 6px 26px rgba(192,128,72,.30); }
+.toast--ach .toast-glow {
+  background: radial-gradient(ellipse at 20% 50%, rgba(232,180,74,.26), transparent 62%);
+}
+.toast-badge--ach {
+  background: linear-gradient(145deg, #FFFDF6, #F2E4C4);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 4px 12px rgba(196,150,50,.32);
+  display: grid; place-items: center;
+}
+.toast-badge--ach .pxi { width: 30px; height: 30px; }
+.toast--ach .toast-body small {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--c-ink-4);
+}
+
 /* [hidden] muss display-Regeln der Komponenten schlagen */
 [hidden] { display: none !important; }

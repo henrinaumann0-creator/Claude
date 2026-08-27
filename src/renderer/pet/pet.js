@@ -12,7 +12,9 @@
     menu: $('menu'), menuName: $('menuName'), menuLevel: $('menuLevel'),
     menuBar: $('menuBar'), menuAvatar: $('menuAvatar'),
     toast: $('toast'), toastBadge: $('toastBadge'), toastTitle: $('toastTitle'),
-    toastText: $('toastText'), confetti: $('confetti')
+    toastText: $('toastText'), confetti: $('confetti'),
+    achToast: $('achToast'), achIcon: $('achIcon'), achTier: $('achTier'),
+    achTitle: $('achTitle'), achText: $('achText')
   };
 
   const SIZE = typeof window.__petSize === 'number' ? window.__petSize : 132;
@@ -34,7 +36,8 @@
     menuOpen: false,
     interactive: false,
     drag: null,
-    trailTimer: null
+    trailTimer: null,
+    walkDist: 0
   };
 
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -191,6 +194,7 @@
     const speed = (fast ? 310 : 205) * (opts.speedFactor || 1);
     const dur = Math.max(320, (dist / speed) * 1000);
 
+    S.walkDist = dist;
     setFacing(dx >= 0 ? 1 : -1);
     setMode('walking');
     el.pet.style.transition = '';
@@ -214,6 +218,10 @@
   function arrive(opts = {}) {
     setMode('idle');
     stopTrail();
+    if (S.walkDist > 0 && window.pets.trackStat) {
+      window.pets.trackStat('distance', Math.round(S.walkDist));
+      S.walkDist = 0;
+    }
     if (opts.xp !== false) window.pets.addXp('walk');
     if (opts.thought !== false && Math.random() < 0.55) {
       showThought(Thoughts.pick([], { context: 'afterWalk' }));
@@ -404,6 +412,44 @@
   }
 
   /* =========================================================
+     Erfolge
+     ========================================================= */
+  let achTimer = null;
+  let achQueue = [];
+
+  function showAchievements(list) {
+    achQueue = achQueue.concat(list || []);
+    if (!el.achToast.hidden) return;
+    nextAchievement();
+  }
+
+  function nextAchievement() {
+    const a = achQueue.shift();
+    if (!a) return;
+    const tier = Achievements.TIERS[a.tier];
+
+    el.achIcon.innerHTML = Icons.build(a.icon, { tone: tier.tone, size: 30 });
+    el.achTier.textContent = tier.label + '-Erfolg';
+    el.achTitle.textContent = a.name;
+    el.achText.textContent = `+${tier.xp} XP`;
+    el.achToast.dataset.tier = a.tier;
+
+    el.achToast.hidden = false;
+    el.achToast.classList.remove('is-leaving');
+    spawn('sparkle', 6, { life: 1100 });
+
+    clearTimeout(achTimer);
+    achTimer = setTimeout(() => {
+      el.achToast.classList.add('is-leaving');
+      setTimeout(() => {
+        el.achToast.hidden = true;
+        el.achToast.classList.remove('is-leaving');
+        if (achQueue.length) nextAchievement();
+      }, 340);
+    }, 4200);
+  }
+
+  /* =========================================================
      Interaktion
      ========================================================= */
   function wake() {
@@ -473,6 +519,7 @@
     S.drag = null;
     if (moved) {
       setMode('idle');
+      if (window.pets.trackStat) window.pets.trackStat('drags', 1);
       // Sanft auf den Boden absetzen
       const r = roam();
       const floorY = r.y + r.h - SIZE - 10;
@@ -528,6 +575,7 @@
     S.drag = null;
     if (moved) {
       setMode('idle');
+      if (window.pets.trackStat) window.pets.trackStat('drags', 1);
       const r = roam();
       const floorY = r.y + r.h - SIZE - 10;
       if (S.y < floorY - 40) walkTo(S.x, floorY, { xp: false, thought: false, speedFactor: 1.6 });
@@ -690,6 +738,9 @@
     const prev = S.snap;
     applySnapshot(snap, prev);
     if (snap.levelUp) showLevelUp(snap.levelUp);
+    if (snap.achievementsUnlocked && snap.achievementsUnlocked.length) {
+      setTimeout(() => showAchievements(snap.achievementsUnlocked), snap.levelUp ? 5400 : 400);
+    }
     if (snap.reset) { place(homePosition().x, homePosition().y, true); }
   });
 
@@ -726,7 +777,13 @@
   /* =========================================================
      Start
      ========================================================= */
+  /* Die Web-Hülle darf das Pet neu einordnen, wenn ihr Spielplatz
+     verschoben wird (Scrollen, Tab-Wechsel, Drehung). */
+  window.__petReplace = () => place(S.x, S.y);
+  window.__petGoHome = () => { const h = homePosition(); place(h.x, h.y); };
+
   (async function init() {
+    Icons.hydrate(document);
     const snap = await window.pets.getState();
     applySnapshot(snap, null);
 

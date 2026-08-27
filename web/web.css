@@ -34,9 +34,53 @@ input, textarea, select, .code-box {
 .road-item { grid-template-columns: 54px minmax(0, 1fr) auto; }
 .road-main strong, .road-main small, .card-note, .next-hint { overflow-wrap: anywhere; }
 
-/* Die Bühne des Pets liegt über der Oberfläche, lässt Klicks aber durch */
-.stage { z-index: 60; }
+/* ------------------------------------------------------------
+   Der Spielplatz
+   Im Browser läuft das Pet ausschließlich in diesem Feld –
+   dadurch überdeckt es nie Text, Karten oder Schaltflächen.
+   ------------------------------------------------------------ */
+.stage { z-index: 60; transition: opacity .3s var(--ease-out); }
 .pet { z-index: 61; }
+
+.stage.is-away { opacity: 0; pointer-events: none; }
+.stage.is-away .pet-art { pointer-events: none; }
+
+/* Im Browser ist der Spielplatz die volle Breite wert –
+   sonst hat das Pet keinen Platz zum Laufen. */
+.hero { grid-template-columns: minmax(0, 1fr); }
+
+#petYard {
+  min-height: 300px;
+  background:
+    radial-gradient(130% 90% at 50% 0%, #FFFFFF 0%, var(--c-orange-wash) 58%, #F4DFD3 100%);
+  border: 1px solid var(--c-line);
+  overflow: visible;
+}
+#petYard::after {
+  content: "Spielplatz";
+  position: absolute;
+  left: 12px; top: 10px;
+  font-size: 10.5px; font-weight: 650;
+  letter-spacing: .07em; text-transform: uppercase;
+  color: var(--c-orange-deep);
+  opacity: .45;
+  pointer-events: none;
+}
+/* Der lebende Begleiter ersetzt hier die Standbild-Vorschau;
+   sein eigener Schatten macht Boden und Lichtkreis überflüssig. */
+#petYard .hero-pet,
+#petYard .hero-floor,
+#petYard .hero-glow { display: none; }
+
+/* Angedeuteter Boden, damit das Feld nicht leer wirkt */
+#petYard::before {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 34%;
+  background: linear-gradient(180deg, transparent, rgba(191, 92, 60, .10));
+  pointer-events: none;
+}
 
 /* ------------------------------------------------------------
    Kopfzeile (nur schmale Bildschirme)
@@ -122,7 +166,11 @@ input, textarea, select, .code-box {
     line-height: 1.15;
     letter-spacing: -.01em;
   }
-  .nav-item span:not(.nav-ico) { display: inline; }
+  .sidebar .nav-item .nav-text { display: none; }
+  .sidebar .nav-item .nav-text--short { display: inline; }
+  .nav-item { padding: 6px 1px 5px; font-size: 9.5px; border-radius: 11px; }
+  .nav-ico { width: 18px; height: 18px; }
+  .nav-ico .pxi { width: 17px; height: 17px; }
   .nav-item.is-active::before { display: none; }
   .nav-item.is-active { background: var(--c-surface); box-shadow: var(--sh-1); }
   .nav-ico { font-size: 17px; width: auto; }
@@ -188,15 +236,51 @@ input, textarea, select, .code-box {
 
   .xp-row { grid-template-columns: 88px minmax(0, 1fr) 56px; gap: 9px; font-size: 12px; }
 
+  /* Erfolge */
+  .tier-row { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; }
+  .tier-card { flex-direction: column; align-items: center; text-align: center; gap: 5px; padding: 11px 6px 13px; }
+  .tier-ico .pxi { width: 28px; height: 28px; }
+  .tier-body { align-items: center; }
+  .tier-body strong { font-size: 12.5px; }
+  .tier-body small { font-size: 10.5px; }
+
+  .ach-grid { grid-template-columns: minmax(0, 1fr); gap: 9px; }
+  .ach {
+    grid-template-columns: 46px minmax(0, 1fr);
+    grid-template-areas: "badge main" "badge side";
+    gap: 6px 12px;
+    padding: 12px 13px;
+    align-items: start;
+  }
+  .ach-badge { grid-area: badge; width: 46px; height: 46px; align-self: center; }
+  .ach-badge .pxi { width: 32px; height: 32px; }
+  .ach-main { grid-area: main; }
+  .ach-main strong { font-size: 13.5px; }
+  .ach-main small { font-size: 12px; }
+  .ach-side {
+    grid-area: side;
+    flex-direction: row; align-items: center; gap: 8px;
+    justify-content: flex-start;
+  }
+  .ach-tier { font-size: 9.5px; }
+  .ach-xp { font-size: 11px; }
+
   .row-toggle, .row-slider { gap: 14px; padding: 12px 0; }
   .row-toggle strong, .row-slider strong { font-size: 13px; }
   input[type="range"] { width: 130px; }
   .danger-row { flex-direction: column; align-items: flex-start; gap: 12px; }
 
   .snackbar { bottom: calc(78px + env(safe-area-inset-bottom)); font-size: 12.5px; }
-  .toast { right: 14px; bottom: calc(78px + env(safe-area-inset-bottom)); padding: 12px 16px 12px 12px; }
+  .toast {
+    left: 10px; right: 10px; bottom: auto;
+    top: calc(60px + env(safe-area-inset-top));
+    padding: 11px 14px 11px 11px;
+  }
+  .toast-body strong { font-size: 13px; }
+  .toast-body span { font-size: 12px; }
   .toast-badge { width: 40px; height: 40px; font-size: 16px; }
-  .bubble { max-width: min(260px, calc(100vw - 40px)); }
+  .bubble { max-width: min(250px, calc(100vw - 44px)); }
+  #petYard { min-height: 300px; }
   .bubble-text { font-size: 13px; }
   .menu { min-width: 200px; }
   .menu-item { padding: 11px 10px; font-size: 13.5px; }
@@ -213,6 +297,8 @@ input, textarea, select, .code-box {
    ------------------------------------------------------------ */
 @media (min-width: 861px) {
   .app { height: 100vh; }
+  .toast { right: 22px; bottom: 22px; }
+  #petYard { min-height: 360px; }
 }
 
 /* Auf Touch-Geräten Hover-Effekte zurückhalten */

@@ -21,6 +21,7 @@ und als Web-App (PWA) für Browser und Handy.
 | Das Pet lebt | als transparentes Overlay **über allen Fenstern** | über der App-Oberfläche |
 | Bedienung | Links-/Rechtsklick, Ziehen | Tippen, Halten, Ziehen |
 | Zusätzlich | Tray-Symbol, Autostart | zum Startbildschirm hinzufügbar, offline nutzbar |
+| Wo das Pet läuft | über allen Fenstern | im eigenen **Spielplatz**, nie über Inhalten |
 | Spielstand | lokal im Benutzerordner | lokal im Browser |
 
 Beide Varianten teilen sich denselben Code: Charaktere, Level-Kurve, Belohnungen und
@@ -34,12 +35,20 @@ nimmst du deinen Fortschritt von einem Gerät aufs andere mit.
 
 Dein Pet sitzt unten rechts – in der Desktop-App als **transparentes Overlay** über allen Fenstern, aber klick-durchlässig: Du arbeitest ganz normal weiter, bis du den Mauszeiger wirklich auf das Tier bewegst.
 
-* 🐾 **Sechs Pixel-Charaktere** – Fuchs, Katze, Blob, Roboter, Pinguin, Drache. Jeder mit eigenem Laufzyklus, Blinzeln, Schlaf- und Freude-Animation.
-* 💭 **Gedankenblasen** mit Schreibmaschinen-Effekt – über 80 Sprüche in sechs Paketen, dazu tages- und situationsabhängige Gedanken.
-* ⭐ **Level 1–50** mit sichtbarem XP-Balken. XP gibt es fürs Streicheln, Spazieren, Füttern, Spielen, Gedankenlesen und einfach fürs Dabeisein.
-* 🎁 **34 Belohnungen**, gestaffelt über die Level: neue Pets, Accessoires, Farbpaletten, Gedanken-Pakete, Partikel-Effekte und Fähigkeiten.
-* 📊 **Dashboard** im Claude-Look: Übersicht, Belohnungs-Roadmap, Ausstattung, Statistik, Einstellungen.
-* 🔥 **Tages-Streak** – wer täglich vorbeischaut, bekommt einen wachsenden Bonus.
+* **Sechs Pixel-Charaktere** – Fuchs, Katze, Blob, Roboter, Pinguin, Drache. Jeder mit eigenem
+  Laufzyklus, Blinzeln, Schlaf- und Freude-Animation, weichen Konturen und Wangenrot.
+* **Gedankenblasen** mit Schreibmaschinen-Effekt – über 80 Sprüche in sechs Paketen, dazu
+  tages- und situationsabhängige Gedanken.
+* **Level 1–50** mit sichtbarem XP-Balken. XP gibt es fürs Streicheln, Spazieren, Füttern,
+  Spielen, Gedankenlesen und einfach fürs Dabeisein.
+* **34 Belohnungen**, gestaffelt über die Level: neue Pets, Accessoires, Farbpaletten,
+  Gedanken-Pakete, Partikel-Effekte und Fähigkeiten.
+* **29 Erfolge** in Bronze, Silber und Gold – jeder mit Fortschrittsbalken und Bonus-XP.
+* **Dashboard** im Claude-Look: Übersicht, Belohnungen, Erfolge, Ausstattung, Statistik,
+  Einstellungen.
+* **Tages-Streak** – wer täglich vorbeischaut, bekommt einen wachsenden Bonus.
+* **Jedes Symbol selbst gezeichnet** – 29 Pixel-Icons aus derselben Zeichenmaschine wie die
+  Charaktere. Keine Emojis, keine fremden Grafiken.
 
 ---
 
@@ -99,6 +108,25 @@ sein: *Settings → Pages → Source: **GitHub Actions***.
 
 Auf dem Handy: Seite im Browser öffnen → *Zum Home-Bildschirm hinzufügen*. Danach
 startet Claude Pets wie eine normale App im Vollbild und läuft auch offline.
+
+**Der Spielplatz:** Im Browser hat das Pet ein eigenes Feld auf der Übersicht und läuft
+ausschließlich dort. Es verdeckt also nie Text, Karten oder Schaltflächen – auch nicht beim
+Scrollen oder Drehen. Auf allen anderen Seiten blendet es sich aus.
+
+---
+
+## Erfolge
+
+29 Abzeichen in drei Stufen, jedes mit sichtbarem Fortschritt und Bonus-XP:
+
+| Stufe | Anzahl | Bonus | Beispiele |
+| --- | --- | --- | --- |
+| Bronze | 9 | je 25 XP | Erste Berührung · Erster Ausflug · Drei Tage am Stück · Umzugshelfer |
+| Silber | 12 | je 60 XP | Kraulmeister (100×) · Nachteule · Frühaufsteher · Weite Wege (25.000 px) |
+| Gold | 8 | je 150 XP | Volles Haus · Farbenfroh · Sammler · Legende (Level 50) |
+
+Zusammen bringen alle Abzeichen **2.145 zusätzliche XP**. Erfolge prüfen sich nach jeder
+Aktion selbst; neu erreichte melden sich mit einem Banner am Pet und im Dashboard.
 
 ---
 
@@ -168,7 +196,10 @@ src/
 │  └─ store.js         Persistenz (atomares JSON in userData)
 ├─ shared/
 │  ├─ theme.css        Design-Tokens (Orange/Grau)
+│  ├─ pixel.js         Pixel-Zeichenmaschine (Grundlage für alle Grafiken)
+│  ├─ icons.js         29 handgezeichnete Pixel-Symbole in sieben Farbtönen
 │  ├─ progression.js   Level-Kurve, XP-Quellen, Belohnungs-Katalog
+│  ├─ achievements.js  Erfolgs-Katalog und Auswertung
 │  └─ thoughts.js      Gedanken-Pakete
 ├─ renderer/
 │  ├─ pet/             Overlay: Pixel-Charaktere, Frame-Treiber, Verhalten
@@ -195,7 +226,13 @@ bereitstellt wie der Electron-Preload (`window.pets`). `build-web.js` schneidet 
 Markup aus den bestehenden HTML-Dateien und setzt es in die Web-Hülle ein – es gibt
 also keine doppelt gepflegten Kopien.
 
-**Pixel-Grafik ohne Bilddateien:** Jeder Charakter wird zur Laufzeit auf einem 32 × 32-Raster aus geometrischen Grundformen gezeichnet, automatisch umrandet und schattiert und dann als SVG aus Pixel-Rechtecken ausgegeben (`shape-rendering: crispEdges`). Dadurch lässt sich jede Farbpalette auf jeden Charakter anwenden, und die Sprites bleiben in jeder Größe gestochen scharf. Animiert wird wie in klassischer Pixel-Kunst: echte Frame-Wechsel statt weicher Transformationen.
+**Pixel-Grafik ohne Bilddateien:** `src/shared/pixel.js` ist eine kleine Zeichenmaschine –
+Ellipsen, Dreiecke, Linien, Spiegelung, automatische Kontur und Schattierung auf einem
+Zeichen-Raster. Charaktere entstehen darauf mit 32 × 32, Symbole mit 16 × 16. Ausgegeben wird
+SVG aus Pixel-Rechtecken (`shape-rendering: crispEdges`), dadurch bleibt alles in jeder Größe
+gestochen scharf und jede Farbpalette lässt sich auf jeden Charakter anwenden. Animiert wird
+wie in klassischer Pixel-Kunst: echte Frame-Wechsel statt weicher Transformationen. Obere
+Konturkanten werden aufgehellt (*selective outlining*), damit die Silhouetten rund wirken.
 
 **Datenschutz:** Die App sendet nichts ins Netz. Der Spielstand liegt lokal unter `%APPDATA%/Claude Pets/pet-state.json` (Windows), `~/Library/Application Support/Claude Pets/` (macOS) bzw. `~/.config/Claude Pets/` (Linux).
 

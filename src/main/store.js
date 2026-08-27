@@ -21,7 +21,14 @@ function defaultState() {
     hunger: 100,
     lastFedAt: 0,
     lastPlayedAt: 0,
-    stats: { pets: 0, walks: 0, thoughts: 0, minutes: 0, feeds: 0, plays: 0, levelUps: 0 },
+    stats: {
+      pets: 0, walks: 0, thoughts: 0, minutes: 0, feeds: 0, plays: 0, levelUps: 0,
+      drags: 0, distance: 0, nightPets: 0, morningPets: 0
+    },
+    achievements: [],
+    worn: [],
+    petsTried: ['nova'],
+    palettesTried: ['amber'],
     equipped: { pet: 'nova', accessory: null, palette: 'amber', effect: null },
     thoughtPacks: ['alltag'],
     seenRewards: ['nova', 'amber', 'alltag'],

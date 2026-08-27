@@ -1,9 +1,10 @@
 /* Claude Pets – Service Worker: App-Shell offline verfügbar halten. */
-const CACHE = 'claude-pets-v1';
+const CACHE = 'claude-pets-v2';
 const SHELL = [
   './', './index.html', './web.css', './core.js', './app.js', './manifest.webmanifest',
   './lib/theme.css', './lib/dashboard.css', './lib/pet.css',
-  './lib/progression.js', './lib/thoughts.js', './lib/pets.js',
+  './lib/pixel.js', './lib/icons.js',
+  './lib/progression.js', './lib/achievements.js', './lib/thoughts.js', './lib/pets.js',
   './lib/pet.js', './lib/dashboard.js',
   './icons/icon-64.png', './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png'
 ];

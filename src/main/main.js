@@ -11,6 +11,7 @@ const path = require('path');
 
 const { Store } = require('./store');
 const Progression = require('../shared/progression');
+const Achievements = require('../shared/achievements');
 
 const IS_DEV = process.argv.includes('--dev');
 const ASSETS = path.join(__dirname, '..', 'assets');
@@ -45,6 +46,7 @@ function snapshot() {
   const prog = Progression.levelFromTotalXp(s.totalXp);
   const unlocked = Progression.unlocked(prog.level);
   return {
+    achievements: Achievements.summary(s, prog.level),
     state: s,
     level: prog.level,
     xpInLevel: prog.xpInLevel,
@@ -69,6 +71,27 @@ function broadcast(extra) {
     if (win && !win.isDestroyed()) win.webContents.send('state:update', payload);
   }
   updateTrayTitle(payload);
+}
+
+/* ------------------------------------------------------------
+   Erfolge
+   ------------------------------------------------------------ */
+/**
+ * Wertet die Erfolge aus, schreibt neu erreichte fort und schenkt die
+ * zugehoerigen XP. Da die XP wiederum ein Level ausloesen koennen,
+ * laeuft das in wenigen Durchgaengen, bis nichts Neues mehr dazukommt.
+ */
+function checkAchievements() {
+  const gained = [];
+  for (let pass = 0; pass < 3; pass++) {
+    const s = store.get();
+    const level = Progression.levelFromTotalXp(s.totalXp).level;
+    const res = Achievements.evaluate(s, level);
+    if (!res.newly.length) break;
+    store.update({ achievements: res.all, totalXp: s.totalXp + res.xp });
+    gained.push(...res.newly);
+  }
+  return gained;
 }
 
 /* ------------------------------------------------------------
@@ -99,17 +122,29 @@ function addXp(kind, multiplier = 1) {
   const statKey = { pet: 'pets', walk: 'walks', thought: 'thoughts', feed: 'feeds', play: 'plays', idle: 'minutes' }[kind];
   const patch = { totalXp };
   if (statKey) patch.stats = { [statKey]: (s.stats[statKey] || 0) + 1 };
+  if (kind === 'pet') {
+    const hour = new Date().getHours();
+    if (hour >= 23 || hour < 5) patch.stats = Object.assign(patch.stats || {}, { nightPets: (s.stats.nightPets || 0) + 1 });
+    else if (hour >= 5 && hour < 8) patch.stats = Object.assign(patch.stats || {}, { morningPets: (s.stats.morningPets || 0) + 1 });
+  }
   if (after > before) patch.stats = Object.assign(patch.stats || {}, { levelUps: (s.stats.levelUps || 0) + (after - before) });
   store.update(patch);
 
-  const leveledUp = after > before;
+  const earned = checkAchievements();
+  const finalLevel = Progression.levelFromTotalXp(store.get().totalXp).level;
+
+  const leveledUp = finalLevel > before;
   const newRewards = [];
   if (leveledUp) {
-    for (let lvl = before + 1; lvl <= after; lvl++) newRewards.push(...Progression.rewardsAtLevel(lvl));
+    for (let lvl = before + 1; lvl <= finalLevel; lvl++) newRewards.push(...Progression.rewardsAtLevel(lvl));
   }
 
-  broadcast(leveledUp ? { levelUp: { from: before, to: after, rewards: newRewards } } : null);
-  return { gained: amount, leveledUp, level: after, rewards: newRewards };
+  const extra = {};
+  if (leveledUp) extra.levelUp = { from: before, to: finalLevel, rewards: newRewards };
+  if (earned.length) extra.achievementsUnlocked = earned;
+  broadcast(Object.keys(extra).length ? extra : null);
+
+  return { gained: amount, leveledUp, level: finalLevel, rewards: newRewards, achievements: earned };
 }
 
 /* ------------------------------------------------------------
@@ -312,11 +347,20 @@ function registerIpc() {
     const level = Progression.levelFromTotalXp(store.get().totalXp).level;
     if (id !== null && !Progression.isUnlocked(id, level)) return snapshot();
     store.update({ equipped: { [slot]: id } });
+    if (id) {
+      const listKey = { accessory: 'worn', pet: 'petsTried', palette: 'palettesTried' }[slot];
+      if (listKey) {
+        const list = store.get()[listKey] || [];
+        if (!list.includes(id)) store.update({ [listKey]: list.concat(id) });
+      }
+    }
     if (slot === 'pet' && id) {
       const reward = Progression.byId(id);
       if (reward) store.update({ petName: reward.name });
     }
-    broadcast({ equipChanged: slot });
+    const earned = checkAchievements();
+    broadcast(earned.length ? { equipChanged: slot, achievementsUnlocked: earned }
+                            : { equipChanged: slot });
     buildTrayMenu();
     return snapshot();
   });
@@ -398,6 +442,16 @@ function registerIpc() {
     return snapshot();
   });
 
+  ipcMain.handle('stat:track', (_e, key, amount) => {
+    const allowed = ['drags', 'distance'];
+    if (!allowed.includes(key)) return false;
+    const s = store.get();
+    store.update({ stats: { [key]: (s.stats[key] || 0) + Math.max(0, Math.round(amount || 1)) } });
+    const earned = checkAchievements();
+    if (earned.length) broadcast({ achievementsUnlocked: earned });
+    return true;
+  });
+
   ipcMain.handle('pet:command', (_e, type) => {
     if (!overlayWin || overlayWin.isDestroyed()) return false;
     if (!store.get().settings.visible) setOverlayVisible(true);
@@ -435,6 +489,7 @@ app.whenReady().then(() => {
   registerIpc();
   createOverlay();
   createTray();
+  checkAchievements();
   checkDailyBonus();
   startIdleXp();
 

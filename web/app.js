@@ -6,9 +6,6 @@
 'use strict';
 
 (() => {
-  const TABBAR_BREAKPOINT = 860;
-  const isNarrow = () => window.innerWidth < TABBAR_BREAKPOINT;
-
   let currentView = 'home';
 
   /* ---------------------------------------------------------
@@ -16,8 +13,11 @@
      Auf allen Seiten außer der Übersicht parkt das Pet in der Ecke,
      damit es keine Inhalte verdeckt.
      --------------------------------------------------------- */
+  const yard = () => document.getElementById('petYard');
+
+  /** Höhe von Kopfzeile und Tab-Leiste, damit beide frei bleiben. */
   function chrome() {
-    if (!isNarrow()) return { top: 0, bottom: 0 };
+    if (window.innerWidth >= 861) return { top: 0, bottom: 0 };
     const bar = document.querySelector('.topbar');
     const tabs = document.querySelector('.sidebar');
     return {
@@ -26,26 +26,43 @@
     };
   }
 
+  /**
+   * Das Pet lebt im Browser auf einem eigenen Spielplatz und läuft
+   * ausschließlich dort – so verdeckt es nie Text oder Schaltflächen.
+   */
   window.__petRoam = () => {
-    const c = chrome();
+    const box = yard();
     const size = window.__petSize || 132;
-    const full = {
-      x: 0,
-      y: c.top,
-      w: window.innerWidth,
-      h: Math.max(size + 40, window.innerHeight - c.top - c.bottom)
-    };
-    if (currentView === 'home') return full;
+    if (!box) return { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight };
+    const r = box.getBoundingClientRect();
+    const c = chrome();
+    const padX = 8;
 
-    // Geparkte Ecke
-    const boxW = Math.min(size + 60, full.w);
+    // Der Laufbereich ist der Spielplatz, zusätzlich beschnitten auf das,
+    // was gerade sichtbar ist – so gerät das Pet nie unter Kopfzeile
+    // oder Tab-Leiste, egal wie weit gescrollt wurde.
+    const top = Math.max(r.top + 10, c.top + 6);
+    const bottom = Math.min(r.bottom - 8, window.innerHeight - c.bottom - 6);
+
     return {
-      x: full.x + full.w - boxW,
-      y: full.y + full.h - (size + 26),
-      w: boxW,
-      h: size + 26
+      x: r.left + padX,
+      y: top,
+      w: Math.max(size + 24, r.width - padX * 2),
+      h: Math.max(size + 16, bottom - top)
     };
   };
+
+  /** Sichtbar nur, wenn der Spielplatz auch wirklich zu sehen ist. */
+  function yardVisible() {
+    if (currentView !== 'home') return false;
+    const box = yard();
+    if (!box) return false;
+    const r = box.getBoundingClientRect();
+    const size = window.__petSize || 132;
+    const c = chrome();
+    const shown = Math.min(r.bottom, window.innerHeight - c.bottom) - Math.max(r.top, c.top);
+    return shown > size * 0.9;
+  }
 
   /* ---------------------------------------------------------
      Ansichts-Wechsel
@@ -60,9 +77,35 @@
     if (next === currentView) return;
     currentView = next;
     document.body.dataset.view = next;
-    // Pet neu einordnen (pet.js hört auf resize)
-    window.dispatchEvent(new Event('resize'));
+    // Jede Ansicht beginnt oben – sonst landet man mitten in einer Liste
+    const content = document.querySelector('.content');
+    if (content) content.scrollTop = 0;
+    refreshStage(true);
   }
+
+  let lastVisible = null;
+  function refreshStage(recenter) {
+    const stageEl = document.getElementById('stage');
+    if (!stageEl) return;
+
+    const wanted = petEnabled && yardVisible();
+    if (wanted !== lastVisible) {
+      lastVisible = wanted;
+      stageEl.classList.toggle('is-away', !wanted);
+    }
+    if (!wanted) return;
+
+    if (recenter && typeof window.__petGoHome === 'function') window.__petGoHome();
+    else if (typeof window.__petReplace === 'function') window.__petReplace();
+  }
+
+  /* Beim Scrollen wandert der Spielplatz mit – das Pet folgt ihm. */
+  let scrollFrame = null;
+  const onScroll = () => {
+    if (scrollFrame) return;
+    scrollFrame = requestAnimationFrame(() => { scrollFrame = null; refreshStage(false); });
+  };
+  document.addEventListener('scroll', onScroll, true);
 
   document.querySelectorAll('.nav-item').forEach((btn) => {
     btn.addEventListener('click', () => setTimeout(syncView, 0));
@@ -78,17 +121,19 @@
   /* ---------------------------------------------------------
      Sichtbarkeit des Pets & Level in der Kopfzeile
      --------------------------------------------------------- */
-  const stage = document.getElementById('stage');
   const topLevel = document.getElementById('topLevel');
+  let petEnabled = true;
 
   function applySnapshot(snap) {
-    if (stage) stage.hidden = !snap.state.settings.visible;
+    petEnabled = !!snap.state.settings.visible;
     if (topLevel) topLevel.textContent = snap.level;
+    refreshStage(false);
   }
 
   window.pets.onState(applySnapshot);
   window.pets.getState().then((snap) => {
     applySnapshot(snap);
+    setTimeout(() => refreshStage(true), 60);
     window.pets._checkDailyBonus();
   });
 
@@ -98,7 +143,10 @@
   let resizeTimer = null;
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => window.pets._emitResize(window.__petRoam()), 180);
+    resizeTimer = setTimeout(() => {
+      window.pets._emitResize(window.__petRoam());
+      refreshStage(true);
+    }, 180);
   });
 
   // Echte Höhe auf mobilen Browsern (dynamische Adressleiste)
