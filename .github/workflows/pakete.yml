@@ -13,6 +13,8 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+  # Von pakete-probe.yml aufgerufen, um die Pakete ohne Etikett zu prüfen.
+  workflow_call:
 
 permissions:
   contents: write
