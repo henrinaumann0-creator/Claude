@@ -1,0 +1,28 @@
+# Probelauf für den Paketbau: baut dieselben Pakete wie pakete.yml,
+# legt sie aber nur als Anhang des Laufs ab – ohne Veröffentlichung.
+# Gedacht zum Prüfen, bevor ein Versions-Etikett gesetzt wird.
+name: Pakete (Probelauf)
+
+on:
+  push:
+    branches:
+      - "claude/etwas-krasses-ec9utk"
+    paths:
+      - ".github/workflows/pakete*.yml"
+      - "package.json"
+      - "package-lock.json"
+  workflow_dispatch:
+
+# Der aufgerufene Workflow verlangt Schreibrechte (für die
+# Veröffentlichung); weniger darf der Aufrufer nicht gewähren.
+permissions:
+  contents: write
+
+jobs:
+  probelauf:
+    name: Pakete bauen
+    uses: ./.github/workflows/pakete.yml
+    with:
+      # Steht [release] in der Commit-Nachricht, wandern die Pakete
+      # zusätzlich in den Entwurf einer Veröffentlichung.
+      veroeffentlichen: ${{ contains(github.event.head_commit.message, '[release]') }}

@@ -7,6 +7,7 @@
   <title>Claude Pets · Dashboard</title>
   <link rel="stylesheet" href="../../shared/theme.css" />
   <link rel="stylesheet" href="dashboard.css" />
+  <link rel="stylesheet" href="../arcade/arcade.css" />
 </head>
 <body>
 <div class="app">
@@ -26,6 +27,11 @@
         <span class="nav-ico" data-icon="home"></span>
         <span class="nav-text">Übersicht</span>
         <span class="nav-text nav-text--short">Start</span>
+      </button>
+      <button class="nav-item" data-view="arcade">
+        <span class="nav-ico" data-icon="joystick"></span>
+        <span class="nav-text">Arcade</span>
+        <span class="nav-text nav-text--short">Spiele</span>
       </button>
       <button class="nav-item" data-view="rewards">
         <span class="nav-ico" data-icon="gift"></span>
@@ -125,6 +131,52 @@
       </div>
 
       <div class="cards" id="homeCards"></div>
+    </section>
+
+    <!-- ===== Arcade ===== -->
+    <section class="view" data-view="arcade">
+      <header class="view-head">
+        <div>
+          <h1>Arcade</h1>
+          <p class="sub">Drei Minispiele – Hauptrolle: dein Pet. Jede Runde bringt XP.</p>
+        </div>
+        <div class="filters">
+          <button class="chip is-active sound-chip" id="soundChip">
+            <span id="soundIco"></span><span id="soundLabel">Ton an</span>
+          </button>
+        </div>
+      </header>
+
+      <div class="arcade">
+        <div class="cabinet">
+          <div class="cab-top">
+            <span class="cab-title"><span id="cabIco"></span><span id="cabTitle">Snack-Jagd</span></span>
+            <span class="cab-spacer"></span>
+            <span class="cab-status" id="cabStatus"></span>
+            <span class="cab-score"><b id="cabScore">0</b><span>Punkte</span></span>
+          </div>
+
+          <div class="screen">
+            <div class="screen-inner">
+              <canvas id="arcadeScreen" width="320" height="180" aria-label="Spielfeld"></canvas>
+            </div>
+            <div class="veil" id="arcadeVeil"><div class="veil-card" id="veilCard"></div></div>
+          </div>
+
+          <div class="cab-foot">
+            <span class="cab-keys" id="cabKeys"></span>
+            <span id="cabPar"></span>
+          </div>
+        </div>
+
+        <div class="arcade-side">
+          <div class="game-list" id="gameList"></div>
+          <div class="panel">
+            <h3>Bestwerte</h3>
+            <div id="parList"></div>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- ===== Belohnungen ===== -->
@@ -229,6 +281,10 @@
           <input type="checkbox" id="setWander" class="switch" />
         </label>
         <label class="row-toggle">
+          <span><strong>Arcade-Ton</strong><small>Chiptune-Musik und Klänge in den Minispielen</small></span>
+          <input type="checkbox" id="setSound" class="switch" />
+        </label>
+        <label class="row-toggle">
           <span><strong>Mit dem System starten</strong><small>Beim Anmelden automatisch starten</small></span>
           <input type="checkbox" id="setAutostart" class="switch" />
         </label>
@@ -264,7 +320,7 @@
         </div>
       </div>
 
-      <p class="foot">Claude Pets · v1.1.0 · Rechtsklick auf das Pet öffnet das Schnellmenü.</p>
+      <p class="foot">Claude Pets · v1.2.0 · Rechtsklick auf das Pet öffnet das Schnellmenü.</p>
     </section>
   </main>
 </div>
@@ -277,6 +333,8 @@
 <script src="../../shared/achievements.js"></script>
 <script src="../../shared/thoughts.js"></script>
 <script src="../pet/pets.js"></script>
+<script src="../../shared/audio.js"></script>
+<script src="../arcade/arcade.js"></script>
 <script src="dashboard.js"></script>
 </body>
 </html>

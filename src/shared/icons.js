@@ -41,6 +41,15 @@
     });
   }
 
+  /** Lautsprecher – gemeinsame Grundform von `sound` und `mute`. */
+  function speaker(c) {
+    c.rect(2, 7, 2, 3, '2');
+    c.rect(4, 6, 1, 5, '2');
+    c.rect(5, 5, 1, 7, '2');
+    c.rect(6, 4, 1, 9, '2');
+    c.rect(7, 3, 1, 11, '2');
+  }
+
   /* ---------------------------------------------------------
      Die Symbole
      --------------------------------------------------------- */
@@ -391,6 +400,40 @@
         c.tri([14, 10.5], [11, 9], [11, 12], '2');
         c.set(4, 5, '3'); c.set(5, 5, '3');
       }
+    },
+
+    /* — Arcade — */
+    joystick: {
+      outline: true, shade: false,
+      draw(c) {
+        c.rect(2, 11, 12, 3, '2');      // Sockelplatte
+        c.set(2, 11, '.'); c.set(13, 11, '.');
+        c.rect(7, 5, 2, 6, '9');        // Schaft
+        c.ell(8, 3.5, 2.5, 2.5, '2');   // Kugelgriff
+        c.set(7, 2, '3');
+        c.rect(4, 12, 2, 1, '6');       // zwei Knöpfe
+        c.rect(10, 12, 2, 1, '6');
+      }
+    },
+
+    sound: {
+      outline: false, shade: false,
+      draw(c) {
+        speaker(c);
+        // zwei Schallbögen
+        c.set(9, 6, '6'); c.set(10, 7, '6'); c.set(10, 8, '6'); c.set(9, 9, '6');
+        c.set(11, 4, '6'); c.set(12, 5, '6'); c.set(13, 7, '6');
+        c.set(13, 8, '6'); c.set(12, 10, '6'); c.set(11, 11, '6');
+      }
+    },
+
+    mute: {
+      outline: false, shade: false,
+      draw(c) {
+        speaker(c);
+        c.line(10, 5, 14, 9, '2'); c.line(10, 6, 14, 10, '2');
+        c.line(14, 5, 10, 9, '2'); c.line(14, 6, 10, 10, '2');
+      }
     }
   };
 
@@ -441,5 +484,5 @@
     });
   }
 
-  return { build, hydrate, TONES, NAMES: Object.keys(ICONS), SIZE: S };
+  return { build, hydrate, grid, TONES, NAMES: Object.keys(ICONS), SIZE: S };
 });

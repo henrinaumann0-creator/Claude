@@ -1,0 +1,293 @@
+/* ============================================================
+   Claude Pets – Arcade
+   Ein Automat im Claude-Look: warmes Gehäuse, dunkler Schirm,
+   und darin die Pixelbühne.
+
+   Der Schirm zeigt die Bühne immer in einem ganzzahligen
+   Vielfachen ihrer 320x180 – die Größe setzt arcade.js, hier
+   steht nur der Rahmen darum. Deshalb ist jedes Pixel gleich
+   groß und nichts franst aus.
+   ============================================================ */
+
+.arcade {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 286px;
+  gap: 20px;
+  align-items: start;
+}
+
+/* ------------------------------------------------------------
+   Das Gehäuse
+   ------------------------------------------------------------ */
+.cabinet {
+  position: relative;
+  background: var(--c-surface);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-xl);
+  box-shadow: var(--sh-2);
+  padding: 14px;
+  min-width: 0;
+}
+.cabinet::before {
+  content: "";
+  position: absolute; inset: 1px 1px auto;
+  height: 40%;
+  border-radius: calc(var(--r-xl) - 1px) calc(var(--r-xl) - 1px) 0 0;
+  background: linear-gradient(180deg, var(--c-surface-2), transparent);
+  pointer-events: none;
+}
+
+.cab-top {
+  position: relative;
+  display: flex; align-items: center; gap: 12px;
+  padding: 2px 6px 12px;
+}
+.cab-title {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 14px; font-weight: 640; letter-spacing: -.01em;
+}
+.cab-title .pxi { display: block; }
+.cab-spacer { flex: 1; }
+.cab-status {
+  font-size: 12px; color: var(--c-ink-3);
+  letter-spacing: .03em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.cab-score {
+  display: flex; align-items: baseline; gap: 5px;
+  padding: 4px 12px;
+  border-radius: var(--r-pill);
+  background: var(--c-orange-wash);
+  border: 1px solid var(--c-orange-light);
+  color: var(--c-orange-deep);
+  font-variant-numeric: tabular-nums;
+  will-change: transform;
+}
+.cab-score b { font-size: 16px; font-weight: 700; letter-spacing: -.02em; }
+.cab-score span { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; opacity: .75; }
+.cab-score.is-bump { animation: scoreBump .3s var(--ease-spring); }
+@keyframes scoreBump {
+  0%   { transform: scale(1); }
+  45%  { transform: scale(1.11); }
+  100% { transform: scale(1); }
+}
+
+/* ------------------------------------------------------------
+   Der Schirm
+   Außen das Gehäuse, innen exakt die skalierte Bühne. Was an den
+   Rändern übrig bleibt, ist bewusst dunkel – wie bei einem echten
+   Automaten.
+   ------------------------------------------------------------ */
+.screen {
+  position: relative;
+  width: max-content;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 6px;
+  border-radius: var(--r-md);
+  /* Warmes Dunkelbraun statt Schwarz – passt zum Rest der App */
+  background: linear-gradient(180deg, #423A34, #322C28);
+  box-shadow: 0 10px 26px rgba(46,46,43,.18), inset 0 1px 0 rgba(255,255,255,.10);
+}
+.screen-inner {
+  display: block;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #2A2421;
+  font-size: 0;            /* keine Zeilenhöhe unter der Leinwand */
+}
+.screen canvas {
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  touch-action: none;
+  cursor: crosshair;
+  border-radius: 3px;
+}
+
+.cab-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; padding: 11px 6px 2px;
+  font-size: 11.5px; color: var(--c-ink-3);
+}
+.cab-keys { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.key {
+  display: inline-block;
+  padding: 2px 7px;
+  border: 1px solid var(--c-line-strong);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--c-surface);
+  font-size: 10.5px; color: var(--c-ink-2);
+}
+
+/* ------------------------------------------------------------
+   Die Blende über dem Schirm (Start, Pause, Ergebnis)
+   ------------------------------------------------------------ */
+.veil {
+  position: absolute; inset: 6px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+  border-radius: 6px;
+  /* Leicht durchscheinend: das Pet wartet sichtbar hinter der Blende */
+  background: rgba(251,239,230,.80);
+  backdrop-filter: blur(1.5px);
+  animation: veilIn .2s var(--ease-out) both;
+}
+.veil[hidden] { display: none; }
+@keyframes veilIn { from { opacity: 0; } to { opacity: 1; } }
+
+.veil-card {
+  text-align: center;
+  max-width: 340px;
+  animation: cardIn .34s var(--ease-spring) both;
+}
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(7px) scale(.97); }
+  to   { opacity: 1; transform: none; }
+}
+.veil-eyebrow {
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: .1em;
+  color: var(--c-ink-3); font-weight: 600;
+}
+.veil-card h2 {
+  margin: 4px 0 6px;
+  font-size: 21px; font-weight: 680; letter-spacing: -.024em;
+}
+.veil-card p { margin: 0 0 14px; font-size: 12.5px; color: var(--c-ink-2); line-height: 1.5; }
+.veil-card p small { color: var(--c-ink-3); }
+.veil-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.veil-actions .btn { padding: 9px 18px; }
+
+.result {
+  display: flex; align-items: flex-end; justify-content: center; gap: 22px;
+  margin: 6px 0 14px;
+}
+.result-val {
+  font-size: 34px; font-weight: 720; letter-spacing: -.035em; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.result-val--muted { color: var(--c-ink-3); font-size: 26px; }
+.result-lbl {
+  margin-top: 4px;
+  font-size: 10.5px; color: var(--c-ink-3);
+  text-transform: uppercase; letter-spacing: .07em;
+}
+.result-xp {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 13px; border-radius: var(--r-pill);
+  background: linear-gradient(135deg, var(--c-orange), var(--c-orange-deep));
+  color: #fff;
+  font-size: 13px; font-weight: 600;
+  box-shadow: var(--sh-glow);
+}
+.result-record {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-bottom: 4px;
+  padding: 5px 12px; border-radius: var(--r-pill);
+  background: #FDF3DE; border: 1px solid #EEDDAE; color: #8A6413;
+  font-size: 11.5px; font-weight: 600;
+  animation: pop .45s var(--ease-spring) both;
+}
+@keyframes pop {
+  from { transform: scale(.8); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+/* ------------------------------------------------------------
+   Spielauswahl
+   ------------------------------------------------------------ */
+.arcade-side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.game-list { display: flex; flex-direction: column; gap: 10px; }
+
+.game-card {
+  display: grid; grid-template-columns: 42px 1fr; gap: 13px; align-items: start;
+  width: 100%;
+  padding: 13px 15px;
+  text-align: left;
+  background: var(--c-surface);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-1);
+  font: inherit; color: inherit;
+  cursor: pointer;
+  transition: transform .16s var(--ease-out), box-shadow .16s var(--ease-out),
+              border-color .16s var(--ease-out), background .16s var(--ease-out);
+}
+.game-card:hover { transform: translateY(-2px); box-shadow: var(--sh-2); border-color: var(--c-orange-light); }
+.game-card:active { transform: translateY(0) scale(.995); }
+.game-card.is-on { border-color: var(--c-orange); background: var(--c-orange-wash); }
+.game-card-art {
+  display: grid; place-items: center;
+  width: 42px; height: 42px;
+  border-radius: var(--r-md);
+  background: var(--c-bg-sunk);
+  transition: background .16s var(--ease-out);
+}
+.game-card.is-on .game-card-art { background: #fff; }
+.game-card-main { min-width: 0; }
+.game-card-main strong { display: block; font-size: 13.5px; font-weight: 620; }
+.game-card-main small { display: block; font-size: 11.5px; color: var(--c-ink-3); line-height: 1.4; margin-top: 2px; }
+.game-card-meta {
+  display: flex; align-items: center; gap: 8px; margin-top: 8px;
+  font-size: 11px; color: var(--c-ink-3);
+}
+.game-tag {
+  padding: 2px 8px; border-radius: var(--r-pill);
+  background: var(--c-bg-sunk); color: var(--c-ink-2); font-weight: 560;
+}
+.game-card.is-on .game-tag { background: #fff; }
+.game-best { font-variant-numeric: tabular-nums; margin-left: auto; }
+.game-best b { color: var(--c-orange-deep); }
+.game-meter {
+  display: block;
+  height: 4px; margin-top: 8px;
+  border-radius: var(--r-pill);
+  background: var(--c-bg-sunk);
+  overflow: hidden;
+}
+.game-meter i {
+  display: block; height: 100%;
+  border-radius: var(--r-pill);
+  background: linear-gradient(90deg, var(--c-orange), var(--c-orange-soft));
+  transition: width .6s var(--ease-out);
+}
+.game-meter i.is-full { background: linear-gradient(90deg, #C0902B, var(--c-effect)); }
+
+.par-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; padding: 9px 0;
+  border-bottom: 1px solid var(--c-line);
+  font-size: 12.5px;
+}
+.par-row:last-child { border-bottom: 0; }
+.par-name { display: flex; align-items: center; gap: 8px; color: var(--c-ink-2); }
+.par-val { font-variant-numeric: tabular-nums; color: var(--c-ink-3); }
+.par-val b { color: var(--c-ink); font-weight: 640; }
+.par-done { color: var(--c-orange-deep); }
+
+.sound-chip { display: inline-flex; align-items: center; gap: 7px; }
+.sound-chip .pxi { display: block; }
+
+/* ------------------------------------------------------------
+   Schmale Fenster
+   ------------------------------------------------------------ */
+@media (max-width: 980px) {
+  .arcade { grid-template-columns: 1fr; }
+  .arcade-side { order: 2; }
+  .game-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+}
+@media (max-width: 560px) {
+  .cabinet { padding: 10px; border-radius: var(--r-lg); }
+  .cab-top { padding-bottom: 9px; gap: 8px; }
+  .cab-title { font-size: 12.5px; }
+  .cab-status { font-size: 11px; }
+  .screen { padding: 5px; }
+  .veil { inset: 5px; padding: 12px; }
+  .game-card { padding: 11px 13px; }
+  .veil-card h2 { font-size: 18px; }
+  .result { gap: 16px; }
+  .result-val { font-size: 28px; }
+  .cab-foot { font-size: 11px; padding-top: 9px; }
+}

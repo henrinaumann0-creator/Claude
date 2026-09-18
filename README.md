@@ -4,7 +4,8 @@
 
 # Claude Pets
 
-**Ein animierter Pixel-Begleiter mit Level-System, freischaltbaren Belohnungen und lesbaren Gedankenblasen.**
+**Ein animierter Pixel-Begleiter mit Level-System, freischaltbaren Belohnungen,
+lesbaren Gedankenblasen – und einer Arcade mit drei Minispielen samt eigener Chiptune-Musik.**
 
 Helles Orange auf warmem Grau. Als Desktop-App für Windows, macOS und Linux –
 und als Web-App (PWA) für Browser und Handy.
@@ -20,6 +21,7 @@ und als Web-App (PWA) für Browser und Handy.
 | Läuft auf | Windows · macOS · Linux | jedem Browser, Handy inklusive |
 | Das Pet lebt | als transparentes Overlay **über allen Fenstern** | über der App-Oberfläche |
 | Bedienung | Links-/Rechtsklick, Ziehen | Tippen, Halten, Ziehen |
+| Arcade | drei Minispiele im Dashboard | dieselben drei Spiele, mit Finger steuerbar |
 | Zusätzlich | Tray-Symbol, Autostart | zum Startbildschirm hinzufügbar, offline nutzbar |
 | Wo das Pet läuft | über allen Fenstern | im eigenen **Spielplatz**, nie über Inhalten |
 | Spielstand | lokal im Benutzerordner | lokal im Browser |
@@ -41,13 +43,17 @@ Dein Pet sitzt unten rechts – in der Desktop-App als **transparentes Overlay**
   tages- und situationsabhängige Gedanken.
 * **Level 1–50** mit sichtbarem XP-Balken. XP gibt es fürs Streicheln, Spazieren, Füttern,
   Spielen, Gedankenlesen und einfach fürs Dabeisein.
+* **Arcade mit drei Minispielen** – Snack-Jagd, Pixel-Sprint und Gedanken-Paare. Held ist
+  immer *dein* Pet, in deiner Farbe und mit deinem Accessoire. Jede Runde bringt XP.
+* **Musik und Klänge aus dem Nichts** – ein kleiner Chiptune-Synthesizer erzeugt Melodie,
+  Bass und Schlagzeug zur Laufzeit. Keine einzige Audiodatei im Repository.
 * **34 Belohnungen**, gestaffelt über die Level: neue Pets, Accessoires, Farbpaletten,
   Gedanken-Pakete, Partikel-Effekte und Fähigkeiten.
-* **29 Erfolge** in Bronze, Silber und Gold – jeder mit Fortschrittsbalken und Bonus-XP.
-* **Dashboard** im Claude-Look: Übersicht, Belohnungen, Erfolge, Ausstattung, Statistik,
-  Einstellungen.
+* **33 Erfolge** in Bronze, Silber und Gold – jeder mit Fortschrittsbalken und Bonus-XP.
+* **Dashboard** im Claude-Look: Übersicht, Arcade, Belohnungen, Erfolge, Ausstattung,
+  Statistik, Einstellungen.
 * **Tages-Streak** – wer täglich vorbeischaut, bekommt einen wachsenden Bonus.
-* **Jedes Symbol selbst gezeichnet** – 29 Pixel-Icons aus derselben Zeichenmaschine wie die
+* **Jedes Symbol selbst gezeichnet** – 32 Pixel-Icons aus derselben Zeichenmaschine wie die
   Charaktere. Keine Emojis, keine fremden Grafiken.
 
 ---
@@ -64,6 +70,7 @@ Dein Pet sitzt unten rechts – in der Desktop-App als **transparentes Overlay**
 | **Esc** | Menü und Gedankenblase schließen |
 | **Tray-Symbol** (Klick) | Dashboard öffnen |
 | **Tray-Symbol** (Rechtsklick) | Pet ein-/ausblenden, Level ablesen, beenden |
+| **Arcade** (Seitenleiste) | Minispiele – Steuerung steht unter dem Spielfeld |
 
 > Ein entferntes Pet ist nicht weg – es wird nur ausgeblendet. Über das Tray-Menü oder die Einstellungen holst du es zurück.
 
@@ -88,6 +95,23 @@ npm run dist:linux   # Linux    (AppImage)
 
 Die Pakete landen in `dist/`. Für die Entwicklung mit offenen DevTools: `npm run dev`.
 
+**Pakete automatisch bauen lassen:** Ein Versions-Etikett genügt –
+
+```bash
+git tag v1.2.0 && git push origin v1.2.0
+```
+
+Der Workflow `.github/workflows/pakete.yml` baut daraufhin auf je einem
+Windows-, macOS- und Linux-Läufer das passende Paket (Windows-Installer lassen
+sich nun einmal nicht unter Linux erzeugen), packt die Einzeldatei dazu und legt
+alles als **Entwurf einer Veröffentlichung** ab. Der Entwurf wartet auf einen
+Klick, bevor er sichtbar wird.
+
+Ohne Etikett geht es auch: `.github/workflows/pakete-probe.yml` stößt denselben
+Bau bei Änderungen an der Paketierung an und hängt die Pakete an den Lauf.
+Steht zusätzlich `[release]` in der Commit-Nachricht, entsteht daraus ebenfalls
+ein Entwurf – die Versionsnummer kommt dann aus `package.json`.
+
 ### Web-Version
 
 ```bash
@@ -96,6 +120,16 @@ npm run serve:web    # baut und startet http://localhost:4173
 ```
 
 `dist-web/` ist reine Statik ohne Abhängigkeiten und lässt sich überall hosten.
+
+**Alles in einer Datei:**
+
+```bash
+npm run build:single   # baut dist-single/claude-pets.html
+```
+
+Eine einzige HTML-Datei mit Code, Stilen und Symbolen darin – zum Doppelklicken,
+Verschicken oder auf einen USB-Stick legen. Sie braucht weder Server noch Netz.
+Der Spielstand liegt im Browser des jeweiligen Geräts.
 Die mitgelieferte `vercel.json` beschreibt den Build (`node build/build-web.js` →
 `dist-web/`), sodass jeder Push automatisch neu veröffentlicht wird.
 
@@ -115,17 +149,77 @@ Scrollen oder Drehen. Auf allen anderen Seiten blendet es sich aus.
 
 ---
 
+## Arcade
+
+Drei Minispiele, erreichbar über den zweiten Punkt in der Seitenleiste. Gespielt wird auf
+einer 320 × 180 großen Pixelbühne – gezeichnet mit derselben Maschine wie das Pet selbst,
+nur direkt auf eine Leinwand statt als SVG.
+
+| Spiel | Art | Worum es geht | Steuerung | Richtwert |
+| --- | --- | --- | --- | --- |
+| **Snack-Jagd** | Reaktion | Snacks fangen, Bomben ausweichen. Jede fünfte Fangserie gibt Bonuspunkte, drei Bomben beenden die Runde. | ← → · A/D · Finger ziehen | 40 Punkte |
+| **Pixel-Sprint** | Geschick | Endlos nach vorn, über Felsen und Kakteen springen, Sterne einsammeln. Es wird stetig schneller. | Leertaste · ↑ · tippen (länger halten springt höher) | 500 Punkte |
+| **Gedanken-Paare** | Köpfchen | Sechs Paare aus Pixel-Symbolen. Erst kurz einprägen, dann aufdecken – Zeit und Züge kosten Punkte. | Klicken · tippen | 520 Punkte |
+
+* **XP:** Jede Runde zahlt `10 × Faktor` XP. Der Faktor wächst mit den Punkten (0,4 bis 4),
+  am Richtwert gibt es die volle Portion. Eine Glanzrunde bringt also ordentlich, kann das
+  Levelsystem aber nicht aushebeln.
+* **Bestwerte** werden je Spiel gespeichert; ein neuer Rekord meldet sich mit eigener Fanfare.
+* **Vier neue Erfolge** hängen an der Arcade – vom ersten Einwurf bis zum Gold-Abzeichen
+  „Hausrekord" (Richtwert in allen drei Spielen übertroffen).
+* **Pause:** Wer die Ansicht wechselt, verliert keine Runde – sie wartet angehalten.
+
+### Das Bild
+
+Damit Pixelkunst sauber aussieht, muss sie auf dem Raster bleiben – dafür sorgen
+vier Regeln, die `src/renderer/arcade/arcade.js` konsequent durchhält:
+
+* **Ganzzahlige Vergrößerung.** Der Schirm zeigt die Bühne immer in genau 1×, 2×, 3× …
+  ihrer 320 × 180 und wird so gesetzt, dass ein Bühnenpixel exakt auf ganze
+  Gerätepixel fällt. Der Rahmen legt sich danach eng um die Leinwand – kein
+  verwaschenes Skalieren, kein Flimmern beim Scrollen.
+* **Keine krummen Koordinaten.** Alles wird gerundet gezeichnet. Gedreht wird
+  ausschließlich in Vierteln (beim Sturz im Sprint) – jede andere Drehung würde
+  die Kanten ausfransen lassen.
+* **Feste Simulationsschritte.** Die Physik rechnet in 60 Schritten je Sekunde,
+  unabhängig von der Bildrate. Ein Sprung fühlt sich auf 60 Hz genauso an wie auf 144 Hz.
+* **Posen statt Verzerrung.** Stauchen und Strecken entstehen aus echten Frames
+  (Körper tief, Beine gestreckt), nicht aus skalierten Sprites: Sprung, Fall,
+  Landung, Aua – dazu Blinzeln im Leerlauf und ein Laufzyklus, der mit dem Tempo
+  schneller wird.
+
+Himmel, Hügel und Boden entstehen einmal beim Start als fertige Streifen (mit
+Dither-Übergängen wie in klassischer Pixelkunst) und werden danach nur noch
+versetzt kopiert – das hält die Bildrate auch auf dem Handy bei 60.
+
+### Der Klang
+
+`src/shared/audio.js` ist ein kleiner Chiptune-Synthesizer auf Basis der Web Audio API:
+
+* **Pulswellen mit einstellbarer Impulsbreite** – die Wellenform wird aus ihren
+  Fourier-Koeffizienten gebaut (`a(n) = 2/(n·π) · sin(n·π·d)`), genau wie bei alten Soundchips.
+* **Dreieck-Bass** mit Oktavsprüngen, **Schlagzeug** aus gefiltertem Rauschen.
+* **Zwei Stücke** in vier Takten: ein treibendes für die Reaktionsspiele, ein ruhiges für
+  die Gedanken-Paare. Notiert als Textzeilen (`A4 . E5 . A5 . E5 G5 | …`).
+* **Ein Sequenzer mit Vorlauf** plant die Noten ein Stück in die Zukunft – so bleibt der
+  Takt stabil, auch wenn gerade viel auf dem Bildschirm passiert.
+* Zwölf Klangeffekte (Sprung, Münze, Treffer, Serie, Rekord …) entstehen ebenfalls zur Laufzeit.
+
+Ton lässt sich oben rechts in der Arcade oder in den Einstellungen abschalten.
+
+---
+
 ## Erfolge
 
-29 Abzeichen in drei Stufen, jedes mit sichtbarem Fortschritt und Bonus-XP:
+33 Abzeichen in drei Stufen, jedes mit sichtbarem Fortschritt und Bonus-XP:
 
 | Stufe | Anzahl | Bonus | Beispiele |
 | --- | --- | --- | --- |
-| Bronze | 9 | je 25 XP | Erste Berührung · Erster Ausflug · Drei Tage am Stück · Umzugshelfer |
-| Silber | 12 | je 60 XP | Kraulmeister (100×) · Nachteule · Frühaufsteher · Weite Wege (25.000 px) |
-| Gold | 8 | je 150 XP | Volles Haus · Farbenfroh · Sammler · Legende (Level 50) |
+| Bronze | 10 | je 25 XP | Erste Berührung · Erster Ausflug · Münze eingeworfen · Umzugshelfer |
+| Silber | 14 | je 60 XP | Kraulmeister (100×) · Nachteule · Stammgast · Punktesammler |
+| Gold | 9 | je 150 XP | Volles Haus · Farbenfroh · Hausrekord · Legende (Level 50) |
 
-Zusammen bringen alle Abzeichen **2.145 zusätzliche XP**. Erfolge prüfen sich nach jeder
+Zusammen bringen alle Abzeichen **2.440 zusätzliche XP**. Erfolge prüfen sich nach jeder
 Aktion selbst; neu erreichte melden sich mit einem Banner am Pet und im Dashboard.
 
 ---
@@ -142,6 +236,7 @@ XP-Bedarf pro Level: `40 × Level^1.22 + 20` – der Anstieg ist spürbar, aber 
 | Zeit zusammen | 1 | pro Minute mit sichtbarem Pet |
 | Snack | 45 | wenn die Sattheit unter 75 % liegt |
 | Spielen | 25 | alle 30 Minuten |
+| Arcade-Runde | 10 | × 0,4 bis × 4, je nach Punktzahl |
 | Täglicher Besuch | 60 | ×1,15 pro Streak-Tag, max. ×3 |
 
 <details>
@@ -197,12 +292,14 @@ src/
 ├─ shared/
 │  ├─ theme.css        Design-Tokens (Orange/Grau)
 │  ├─ pixel.js         Pixel-Zeichenmaschine (Grundlage für alle Grafiken)
-│  ├─ icons.js         29 handgezeichnete Pixel-Symbole in sieben Farbtönen
+│  ├─ icons.js         32 handgezeichnete Pixel-Symbole in sieben Farbtönen
 │  ├─ progression.js   Level-Kurve, XP-Quellen, Belohnungs-Katalog
 │  ├─ achievements.js  Erfolgs-Katalog und Auswertung
-│  └─ thoughts.js      Gedanken-Pakete
+│  ├─ thoughts.js      Gedanken-Pakete
+│  └─ audio.js         Chiptune-Synthesizer (Musik und Klänge zur Laufzeit)
 ├─ renderer/
 │  ├─ pet/             Overlay: Pixel-Charaktere, Frame-Treiber, Verhalten
+│  ├─ arcade/          Spielbühne und die drei Minispiele
 │  └─ dashboard/       Dashboard-Oberfläche
 └─ assets/             App- und Tray-Icons
 
@@ -217,6 +314,7 @@ web/
 build/
 ├─ make-icons.js       erzeugt alle PNG-Symbole
 ├─ build-web.js        setzt dist-web/ aus src/ und web/ zusammen
+├─ build-single.js     packt alles in eine einzige HTML-Datei
 └─ serve-web.js        kleiner Server zum Ausprobieren
 ```
 

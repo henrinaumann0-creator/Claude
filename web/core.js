@@ -34,8 +34,10 @@
       lastPlayedAt: 0,
       stats: {
         pets: 0, walks: 0, thoughts: 0, minutes: 0, feeds: 0, plays: 0, levelUps: 0,
-        drags: 0, distance: 0, nightPets: 0, morningPets: 0
+        drags: 0, distance: 0, nightPets: 0, morningPets: 0,
+        arcadeRuns: 0, arcadeScore: 0
       },
+      arcade: { best: {} },
       achievements: [],
       worn: [],
       petsTried: ['nova'],
@@ -49,7 +51,8 @@
         scale: 1,
         wander: true,
         launchOnStartup: false,
-        side: 'right'
+        side: 'right',
+        sound: true
       }
     };
   }
@@ -289,6 +292,34 @@
       const res = addXp('play');
       sendCommand({ type: 'play' });
       return { ok: true, xp: res && res.gained };
+    },
+
+    /* Ergebnis einer Arcade-Runde – dieselbe Rechnung wie im Desktop-Build. */
+    async arcadeResult(gameId, score) {
+      const game = P.arcadeGame(gameId);
+      if (!game) return { ok: false };
+
+      const points = Math.max(0, Math.min(100000, Math.round(Number(score) || 0)));
+      const best = (state.arcade && state.arcade.best) || {};
+      const previous = best[gameId] || 0;
+      const record = points > previous;
+
+      update({
+        arcade: { best: { [gameId]: Math.max(points, previous) } },
+        stats: {
+          arcadeRuns: (state.stats.arcadeRuns || 0) + 1,
+          arcadeScore: (state.stats.arcadeScore || 0) + points
+        }
+      });
+
+      const res = addXp('arcade', P.arcadeReward(gameId, points).multiplier);
+      return {
+        ok: true,
+        score: points,
+        best: Math.max(points, previous),
+        record,
+        xp: res ? res.gained : 0
+      };
     },
 
     async setSettings(patch) {

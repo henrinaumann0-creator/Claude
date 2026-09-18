@@ -32,6 +32,7 @@ contextBridge.exposeInMainWorld('pets', {
   command: (type) => ipcRenderer.invoke('pet:command', type),
   trackStat: (key, amount) => ipcRenderer.invoke('stat:track', key, amount),
   play: () => ipcRenderer.invoke('pet:play'),
+  arcadeResult: (game, score) => ipcRenderer.invoke('arcade:result', game, score),
   setSettings: (patch) => ipcRenderer.invoke('settings:set', patch),
   markRewardsSeen: (ids) => ipcRenderer.invoke('rewards:markSeen', ids),
   resetProgress: () => ipcRenderer.invoke('state:reset'),

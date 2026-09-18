@@ -23,8 +23,10 @@ function defaultState() {
     lastPlayedAt: 0,
     stats: {
       pets: 0, walks: 0, thoughts: 0, minutes: 0, feeds: 0, plays: 0, levelUps: 0,
-      drags: 0, distance: 0, nightPets: 0, morningPets: 0
+      drags: 0, distance: 0, nightPets: 0, morningPets: 0,
+      arcadeRuns: 0, arcadeScore: 0
     },
+    arcade: { best: {} },
     achievements: [],
     worn: [],
     petsTried: ['nova'],
@@ -39,7 +41,8 @@ function defaultState() {
       scale: 1,
       wander: true,
       launchOnStartup: false,
-      side: 'right'
+      side: 'right',
+      sound: true
     },
     xpLog: []
   };

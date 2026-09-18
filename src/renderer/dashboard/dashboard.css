@@ -200,10 +200,12 @@ body {
   transition: width .6s var(--ease-out);
   position: relative; overflow: hidden;
 }
-.meter i::after {
+/* Das Glanzlicht läuft nur über den großen XP-Balken. Auf jedem
+   kleinen Balken gleichzeitig wäre es unruhig – und teuer. */
+.meter--lg i::after {
   content: ""; position: absolute; inset: 0;
-  background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,.55) 50%, transparent 80%);
-  animation: shimmer 2.4s linear infinite;
+  background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,.5) 50%, transparent 80%);
+  animation: shimmer 2.6s linear infinite;
 }
 @keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
 .bar--food { background: linear-gradient(90deg, #C9A227, #E2C15C) !important; }

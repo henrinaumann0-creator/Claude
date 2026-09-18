@@ -395,6 +395,35 @@ function registerIpc() {
     return { ok: true, xp: res && res.gained };
   });
 
+  /* Ergebnis einer Arcade-Runde: Bestwert sichern, Statistik fortschreiben, XP zahlen. */
+  ipcMain.handle('arcade:result', (_e, gameId, score) => {
+    const game = Progression.arcadeGame(gameId);
+    if (!game) return { ok: false };
+
+    const points = Math.max(0, Math.min(100000, Math.round(Number(score) || 0)));
+    const s = store.get();
+    const best = (s.arcade && s.arcade.best) || {};
+    const previous = best[gameId] || 0;
+    const record = points > previous;
+
+    store.update({
+      arcade: { best: { [gameId]: Math.max(points, previous) } },
+      stats: {
+        arcadeRuns: (s.stats.arcadeRuns || 0) + 1,
+        arcadeScore: (s.stats.arcadeScore || 0) + points
+      }
+    });
+
+    const res = addXp('arcade', Progression.arcadeReward(gameId, points).multiplier);
+    return {
+      ok: true,
+      score: points,
+      best: Math.max(points, previous),
+      record,
+      xp: res ? res.gained : 0
+    };
+  });
+
   ipcMain.handle('settings:set', (_e, patch) => {
     store.update({ settings: patch || {} });
     if (Object.prototype.hasOwnProperty.call(patch || {}, 'visible')) setOverlayVisible(!!patch.visible);
