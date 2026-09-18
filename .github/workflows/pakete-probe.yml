@@ -13,8 +13,10 @@ on:
       - "package-lock.json"
   workflow_dispatch:
 
+# Der aufgerufene Workflow verlangt Schreibrechte (für die
+# Veröffentlichung); weniger darf der Aufrufer nicht gewähren.
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   probelauf:
