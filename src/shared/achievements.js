@@ -67,6 +67,10 @@
       desc: 'Trage dein Pet 20 Mal an eine andere Stelle.', goal: 20, unit: 'Mal',
       value: (c) => st(c, 'drags') },
 
+    { id: 'arcade-first', tier: 'bronze', icon: 'ball', name: 'Münze eingeworfen',
+      desc: 'Spiele eine Runde in der Arcade.', goal: 1, unit: 'Runde',
+      value: (c) => st(c, 'arcadeRuns') },
+
     /* — Silber: dranbleiben — */
     { id: 'pets-100', tier: 'silver', icon: 'heart', name: 'Kraulmeister',
       desc: 'Streichle dein Pet 100 Mal.', goal: 100, unit: 'Mal',
@@ -116,6 +120,14 @@
       desc: 'Trage drei verschiedene Accessoires.', goal: 3, unit: 'Stück',
       value: (c) => c.worn.length },
 
+    { id: 'arcade-25', tier: 'silver', icon: 'ball', name: 'Stammgast',
+      desc: 'Spiele 25 Arcade-Runden.', goal: 25, unit: 'Runden',
+      value: (c) => st(c, 'arcadeRuns') },
+
+    { id: 'arcade-points', tier: 'silver', icon: 'star', name: 'Punktesammler',
+      desc: 'Hole insgesamt 5.000 Arcade-Punkte.', goal: 5000, unit: 'Punkte',
+      value: (c) => st(c, 'arcadeScore') },
+
     /* — Gold: die großen Ziele — */
     { id: 'all-pets', tier: 'gold', icon: 'trophy', name: 'Volles Haus',
       desc: 'Schalte alle sechs Charaktere frei.', goal: totalOfType('pet'), unit: 'Pets',
@@ -145,6 +157,11 @@
       desc: 'Schalte jede einzelne Belohnung frei.', goal: Progression.REWARDS.length, unit: 'Belohnungen',
       value: (c) => Progression.unlocked(c.level).length },
 
+    { id: 'arcade-master', tier: 'gold', icon: 'medal', name: 'Hausrekord',
+      desc: 'Übertriff in allen drei Minispielen den Richtwert.',
+      goal: Progression.ARCADE_GAMES.length, unit: 'Spiele',
+      value: (c) => Progression.ARCADE_GAMES.filter((g) => n(c.arcade[g.id]) >= g.par).length },
+
     { id: 'legend', tier: 'gold', icon: 'trophy', name: 'Legende',
       desc: 'Erreiche das höchste Level.', goal: Progression.MAX_LEVEL, unit: 'Level',
       value: (c) => c.level }
@@ -164,7 +181,8 @@
       streak: state.streak,
       worn: state.worn || [],
       petsTried: state.petsTried || [],
-      palettesTried: state.palettesTried || []
+      palettesTried: state.palettesTried || [],
+      arcade: (state.arcade && state.arcade.best) || {}
     };
   }
 

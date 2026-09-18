@@ -431,6 +431,10 @@
 
   return {
     build,
+    /** Roh-Raster eines Frames – die Arcade malt es direkt auf die Leinwand. */
+    frame,
+    POSES,
+    W, H,
     PALETTES,
     PET_IDS: Object.keys(PETS),
     PETS,

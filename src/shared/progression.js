@@ -53,8 +53,46 @@
     idle:       { amount: 1,  label: 'Zeit zusammen',       cooldownMs: 0 },
     feed:       { amount: 45, label: 'Snack gefüttert',     cooldownMs: 0 },
     play:       { amount: 25, label: 'Gespielt',            cooldownMs: 0 },
+    arcade:     { amount: 10, label: 'Arcade-Runde',        cooldownMs: 0 },
     dailyBonus: { amount: 60, label: 'Täglicher Besuch',    cooldownMs: 0 }
   };
+
+  /* ---------------------------------------------------------
+     Arcade
+     `par` ist der Richtwert einer guten Runde: wer ihn trifft,
+     bekommt die volle XP-Ausschüttung, darüber hinaus gibt es
+     gedeckelt mehr. So lohnt sich Spielen, ohne dass eine
+     einzige Rekordrunde das ganze Levelsystem aushebelt.
+     --------------------------------------------------------- */
+  const ARCADE_GAMES = [
+    { id: 'catch',  name: 'Snack-Jagd',     icon: 'apple',  par: 40,
+      tag: 'Reaktion',
+      desc: 'Fang, was vom Himmel fällt – und lass die Bomben liegen.',
+      how: 'Pfeiltasten oder A/D bewegen. Am Handy: Finger über das Spielfeld ziehen.' },
+    { id: 'runner', name: 'Pixel-Sprint',   icon: 'boot',   par: 500,
+      tag: 'Geschick',
+      desc: 'Immer geradeaus, über Felsen und Kakteen, Sterne mitnehmen.',
+      how: 'Leertaste oder Tippen springt. Länger halten springt höher.' },
+    { id: 'memory', name: 'Gedanken-Paare', icon: 'bubble', par: 520,
+      tag: 'Köpfchen',
+      desc: 'Sechs Paare, ein Gedächtnis. Je schneller, desto mehr Punkte.',
+      how: 'Karte anklicken oder antippen, zweite dazu – passt es, bleibt es offen.' }
+  ];
+
+  const arcadeGame = (id) => ARCADE_GAMES.find((g) => g.id === id) || null;
+
+  /**
+   * Rechnet Punkte in XP um.
+   * Eine schwache Runde bringt wenig, der Richtwert die volle Portion,
+   * darüber wächst es gebremst bis zum Vierfachen.
+   */
+  function arcadeReward(gameId, score) {
+    const game = arcadeGame(gameId);
+    if (!game) return { multiplier: 0, xp: 0 };
+    const ratio = Math.max(0, Number(score) || 0) / game.par;
+    const multiplier = Math.max(0.4, Math.min(4, 0.4 + ratio * 1.2));
+    return { multiplier, xp: Math.round(XP_EVENTS.arcade.amount * multiplier) };
+  }
 
   /* ---------------------------------------------------------
      Belohnungs-Katalog
@@ -130,6 +168,7 @@
   return {
     MAX_LEVEL, xpForLevel, totalXpForLevel, levelFromTotalXp,
     XP_EVENTS, REWARDS, TYPE_META,
+    ARCADE_GAMES, arcadeGame, arcadeReward,
     byId, unlocked, unlockedIds, isUnlocked, unlockedOfType,
     rewardsAtLevel, nextReward
   };

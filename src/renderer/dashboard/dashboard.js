@@ -62,6 +62,8 @@
       document.querySelectorAll('.view').forEach((v) => v.classList.toggle('is-active', v.dataset.view === target));
       if (target === 'rewards') markRewardsSeen();
       if (target === 'achievements') markAchievementsSeen();
+      if (target === 'arcade') enterArcade();
+      else leaveArcade();
     });
   });
 
@@ -358,6 +360,7 @@
     $('setThoughts').checked = !!st.thoughtsEnabled;
     $('setWander').checked = !!st.wander;
     $('setAutostart').checked = !!st.launchOnStartup;
+    $('setSound').checked = st.sound !== false;
     $('setInterval').value = st.thoughtIntervalSec;
     $('intervalLabel').textContent = `alle ${st.thoughtIntervalSec} Sekunden`;
     $('setSide').value = st.side || 'right';
@@ -371,6 +374,7 @@
   bindToggle('setThoughts', 'thoughtsEnabled');
   bindToggle('setWander', 'wander');
   bindToggle('setAutostart', 'launchOnStartup');
+  $('setSound').addEventListener('change', (e) => setSound(e.target.checked));
 
   $('setInterval').addEventListener('input', (e) => {
     $('intervalLabel').textContent = `alle ${e.target.value} Sekunden`;
@@ -451,16 +455,263 @@
   });
 
   /* ---------------------------------------------------------
+     Arcade
+     Die Spiele selbst stecken in arcade.js – hier hängt nur der
+     Automat drumherum: Auswahl, Anzeige, Ergebnis und XP.
+     --------------------------------------------------------- */
+  const hasArcade = typeof window.Arcade !== 'undefined';
+  const Sound = window.Chip || { setEnabled() {}, play() {}, unlock() {}, stopMusic() {} };
+
+  let arcade = null;
+  let gameId = 'catch';
+  let mode = 'ready';        // ready · playing · paused · result
+  let lastRun = null;
+
+  const gameById = (id) => P.arcadeGame(id) || P.ARCADE_GAMES[0];
+  const bestOf = (id) => ((snap.state.arcade && snap.state.arcade.best) || {})[id] || 0;
+  const lookOf = () => ({
+    pet: snap.state.equipped.pet,
+    palette: snap.state.equipped.palette,
+    accessory: snap.state.equipped.accessory
+  });
+
+  function ensureArcade() {
+    if (arcade || !hasArcade) return arcade;
+    arcade = window.Arcade.create({
+      canvas: $('arcadeScreen'),
+      onTick(score, status) {
+        $('cabScore').textContent = fmt(score);
+        $('cabStatus').textContent = status || '';
+      },
+      onEnd(id, score) { finishRun(id, score); }
+    });
+    arcade.setLook(lookOf());
+    return arcade;
+  }
+
+  function enterArcade() {
+    if (!ensureArcade()) return;
+    arcade.resize();
+    arcade.setLook(lookOf());
+    renderArcade();
+  }
+
+  /** Beim Verlassen der Ansicht läuft nichts weiter – die Runde wartet. */
+  function leaveArcade() {
+    if (!arcade || mode !== 'playing') return;
+    arcade.pause();
+    mode = 'paused';
+    renderArcade();
+  }
+
+  function selectGame(id) {
+    if (mode === 'playing') return;
+    gameId = id;
+    mode = 'ready';
+    lastRun = null;
+    Sound.play('select');
+    renderArcade();
+  }
+
+  function startRun() {
+    if (!ensureArcade()) return;
+    arcade.setLook(lookOf());
+    if (!arcade.start(gameId)) return;
+    mode = 'playing';
+    lastRun = null;
+    $('cabScore').textContent = '0';
+    $('cabStatus').textContent = '';
+    renderArcade();
+  }
+
+  function resumeRun() {
+    if (!arcade) return;
+    arcade.resume();
+    mode = 'playing';
+    renderArcade();
+  }
+
+  function quitRun() {
+    if (arcade) arcade.stop();
+    mode = 'ready';
+    $('cabStatus').textContent = '';
+    renderArcade();
+  }
+
+  async function finishRun(id, score) {
+    mode = 'result';
+    lastRun = { id, score, xp: 0, best: bestOf(id), record: false };
+    renderArcade();
+
+    if (window.pets.arcadeResult) {
+      const res = await window.pets.arcadeResult(id, score);
+      if (res && res.ok) {
+        lastRun = { id, score, xp: res.xp || 0, best: res.best || score, record: !!res.record };
+        snap = await window.pets.getState();
+        render();
+        if (res.record) Sound.play('record');
+      }
+    }
+    renderArcade();
+  }
+
+  /* --- Anzeige --- */
+  function renderArcade() {
+    if (!document.getElementById('gameList')) return;
+    const game = gameById(gameId);
+
+    $('cabIco').innerHTML = I.build(game.icon, { size: 17 });
+    $('cabTitle').textContent = game.name;
+    $('cabPar').textContent = `Richtwert: ${fmt(game.par)} Punkte`;
+    $('cabKeys').innerHTML = keyHint(game.id);
+
+    $('gameList').innerHTML = P.ARCADE_GAMES.map((g) => `
+      <button class="game-card ${g.id === gameId ? 'is-on' : ''}" data-game="${g.id}">
+        <span class="game-card-art">${I.build(g.icon, { size: 26 })}</span>
+        <span class="game-card-main">
+          <strong>${g.name}</strong>
+          <small>${g.desc}</small>
+          <span class="game-card-meta">
+            <span class="game-tag">${g.tag}</span>
+            <span class="game-best">Best: <b>${fmt(bestOf(g.id))}</b></span>
+          </span>
+        </span>
+      </button>`).join('');
+
+    $('parList').innerHTML = P.ARCADE_GAMES.map((g) => {
+      const best = bestOf(g.id);
+      const done = best >= g.par;
+      return `<div class="par-row">
+        <span class="par-name">${I.build(g.icon, { size: 15, tone: done ? 'gold' : 'brand' })}${g.name}</span>
+        <span class="par-val ${done ? 'par-done' : ''}"><b>${fmt(best)}</b> / ${fmt(g.par)}</span>
+      </div>`;
+    }).join('');
+
+    renderVeil(game);
+    renderSoundChip();
+  }
+
+  const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+
+  function keyHint(id) {
+    if (coarse) {
+      return '<span>' + ({
+        catch: 'Finger über das Spielfeld ziehen',
+        runner: 'Tippen springt – halten springt höher',
+        memory: 'Karte antippen'
+      }[id] || 'Tippen') + '</span>';
+    }
+    const keys = {
+      catch: ['←', '→', 'A', 'D'],
+      runner: ['Leertaste', '↑'],
+      memory: ['Klick']
+    }[id] || [];
+    return keys.map((k) => `<span class="key">${k}</span>`).join('')
+      + '<span>oder tippen</span>';
+  }
+
+  function renderVeil(game) {
+    const veil = $('arcadeVeil');
+    const card = $('veilCard');
+
+    if (mode === 'playing') { veil.hidden = true; return; }
+    veil.hidden = false;
+
+    if (mode === 'paused') {
+      card.innerHTML = `
+        <span class="veil-eyebrow">Angehalten</span>
+        <h2>${game.name}</h2>
+        <p>Die Runde wartet auf dich.</p>
+        <div class="veil-actions">
+          <button class="btn btn--primary" data-act="resume">Weiter</button>
+          <button class="btn" data-act="quit">Beenden</button>
+        </div>`;
+      return;
+    }
+
+    if (mode === 'result' && lastRun) {
+      const g = gameById(lastRun.id);
+      const next = P.ARCADE_GAMES[(P.ARCADE_GAMES.indexOf(g) + 1) % P.ARCADE_GAMES.length];
+      card.innerHTML = `
+        <span class="veil-eyebrow">Runde vorbei</span>
+        <h2>${g.name}</h2>
+        ${lastRun.record
+          ? `<div class="result-record">${I.build('medal', { tone: 'gold', size: 14 })} Neuer Bestwert!</div>`
+          : ''}
+        <div class="result">
+          <div><div class="result-val">${fmt(lastRun.score)}</div><div class="result-lbl">Punkte</div></div>
+          <div><div class="result-val">${fmt(Math.max(lastRun.best, lastRun.score))}</div><div class="result-lbl">Bestwert</div></div>
+        </div>
+        <p><span class="result-xp">${I.build('star', { tone: 'cream', size: 14 })} +${fmt(lastRun.xp)} XP</span></p>
+        <div class="veil-actions">
+          <button class="btn btn--primary" data-act="start">Nochmal</button>
+          <button class="btn" data-act="switch" data-game="${next.id}">${next.name}</button>
+        </div>`;
+      return;
+    }
+
+    card.innerHTML = `
+      <span class="veil-eyebrow">${game.tag}</span>
+      <h2>${game.name}</h2>
+      <p>${game.desc}<br /><small>${game.how}</small></p>
+      <div class="veil-actions">
+        <button class="btn btn--primary" data-act="start">${I.build('joystick', { tone: 'cream', size: 15 })} Start</button>
+      </div>`;
+  }
+
+  function renderSoundChip() {
+    const on = snap.state.settings.sound !== false;
+    const chip = $('soundChip');
+    if (!chip) return;
+    chip.classList.toggle('is-active', on);
+    $('soundIco').innerHTML = I.build(on ? 'sound' : 'mute', { tone: on ? 'cream' : 'muted', size: 15 });
+    $('soundLabel').textContent = on ? 'Ton an' : 'Ton aus';
+  }
+
+  async function setSound(on) {
+    Sound.setEnabled(on);
+    if (on) Sound.unlock();
+    snap = await window.pets.setSettings({ sound: !!on });
+    render();
+  }
+
+  if (hasArcade) {
+    $('gameList').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-game]');
+      if (btn) selectGame(btn.dataset.game);
+    });
+
+    $('arcadeVeil').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-act]');
+      if (!btn) return;
+      Sound.unlock();
+      const act = btn.dataset.act;
+      if (act === 'start') startRun();
+      else if (act === 'resume') resumeRun();
+      else if (act === 'quit') quitRun();
+      else if (act === 'switch') { selectGame(btn.dataset.game); startRun(); }
+    });
+
+    $('soundChip').addEventListener('click', () => setSound(snap.state.settings.sound === false));
+
+    // Weggeklickt heißt Pause – niemand verliert eine Runde an einen Tabwechsel.
+    document.addEventListener('visibilitychange', () => { if (document.hidden) leaveArcade(); });
+  }
+
+  /* ---------------------------------------------------------
      Rendern & Live-Updates
      --------------------------------------------------------- */
   function render() {
     if (!snap) return;
+    Sound.setEnabled(snap.state.settings.sound !== false);
+    if (arcade) arcade.setLook(lookOf());
     renderHome();
     renderRoad();
     renderAchievements();
     renderWardrobe();
     renderStats();
     renderSettings();
+    if (mode !== 'playing') renderArcade();
     I.hydrate(document);
 
     const unseenAch = (snap.state.achievements || [])
