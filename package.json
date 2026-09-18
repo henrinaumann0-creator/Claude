@@ -15,6 +15,7 @@
     "dist:mac": "electron-builder --mac",
     "dist:linux": "electron-builder --linux",
     "build:web": "node build/build-web.js",
+    "build:single": "node build/build-single.js",
     "serve:web": "node build/build-web.js && node build/serve-web.js",
     "icons": "node build/make-icons.js"
   },

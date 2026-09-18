@@ -103,6 +103,16 @@ npm run serve:web    # baut und startet http://localhost:4173
 ```
 
 `dist-web/` ist reine Statik ohne Abhängigkeiten und lässt sich überall hosten.
+
+**Alles in einer Datei:**
+
+```bash
+npm run build:single   # baut dist-single/claude-pets.html
+```
+
+Eine einzige HTML-Datei mit Code, Stilen und Symbolen darin – zum Doppelklicken,
+Verschicken oder auf einen USB-Stick legen. Sie braucht weder Server noch Netz.
+Der Spielstand liegt im Browser des jeweiligen Geräts.
 Die mitgelieferte `vercel.json` beschreibt den Build (`node build/build-web.js` →
 `dist-web/`), sodass jeder Push automatisch neu veröffentlicht wird.
 
@@ -287,6 +297,7 @@ web/
 build/
 ├─ make-icons.js       erzeugt alle PNG-Symbole
 ├─ build-web.js        setzt dist-web/ aus src/ und web/ zusammen
+├─ build-single.js     packt alles in eine einzige HTML-Datei
 └─ serve-web.js        kleiner Server zum Ausprobieren
 ```
 

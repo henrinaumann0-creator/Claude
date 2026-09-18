@@ -6,3 +6,4 @@ out/
 .env
 
 dist-web/
+dist-single/
