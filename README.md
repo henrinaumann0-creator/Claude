@@ -142,6 +142,29 @@ nur direkt auf eine Leinwand statt als SVG.
   „Hausrekord" (Richtwert in allen drei Spielen übertroffen).
 * **Pause:** Wer die Ansicht wechselt, verliert keine Runde – sie wartet angehalten.
 
+### Das Bild
+
+Damit Pixelkunst sauber aussieht, muss sie auf dem Raster bleiben – dafür sorgen
+vier Regeln, die `src/renderer/arcade/arcade.js` konsequent durchhält:
+
+* **Ganzzahlige Vergrößerung.** Der Schirm zeigt die Bühne immer in genau 1×, 2×, 3× …
+  ihrer 320 × 180 und wird so gesetzt, dass ein Bühnenpixel exakt auf ganze
+  Gerätepixel fällt. Der Rahmen legt sich danach eng um die Leinwand – kein
+  verwaschenes Skalieren, kein Flimmern beim Scrollen.
+* **Keine krummen Koordinaten.** Alles wird gerundet gezeichnet. Gedreht wird
+  ausschließlich in Vierteln (beim Sturz im Sprint) – jede andere Drehung würde
+  die Kanten ausfransen lassen.
+* **Feste Simulationsschritte.** Die Physik rechnet in 60 Schritten je Sekunde,
+  unabhängig von der Bildrate. Ein Sprung fühlt sich auf 60 Hz genauso an wie auf 144 Hz.
+* **Posen statt Verzerrung.** Stauchen und Strecken entstehen aus echten Frames
+  (Körper tief, Beine gestreckt), nicht aus skalierten Sprites: Sprung, Fall,
+  Landung, Aua – dazu Blinzeln im Leerlauf und ein Laufzyklus, der mit dem Tempo
+  schneller wird.
+
+Himmel, Hügel und Boden entstehen einmal beim Start als fertige Streifen (mit
+Dither-Übergängen wie in klassischer Pixelkunst) und werden danach nur noch
+versetzt kopiert – das hält die Bildrate auch auf dem Handy bei 60.
+
 ### Der Klang
 
 `src/shared/audio.js` ist ein kleiner Chiptune-Synthesizer auf Basis der Web Audio API:

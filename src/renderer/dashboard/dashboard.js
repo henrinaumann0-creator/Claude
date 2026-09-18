@@ -466,6 +466,14 @@
   let gameId = 'catch';
   let mode = 'ready';        // ready · playing · paused · result
   let lastRun = null;
+  let lastScore = 0;
+
+  function bumpScore() {
+    const pill = $('cabScore');
+    pill.classList.remove('is-bump');
+    void pill.offsetWidth;     // Animation neu starten
+    pill.classList.add('is-bump');
+  }
 
   const gameById = (id) => P.arcadeGame(id) || P.ARCADE_GAMES[0];
   const bestOf = (id) => ((snap.state.arcade && snap.state.arcade.best) || {})[id] || 0;
@@ -480,8 +488,20 @@
     arcade = window.Arcade.create({
       canvas: $('arcadeScreen'),
       onTick(score, status) {
-        $('cabScore').textContent = fmt(score);
-        $('cabStatus').textContent = status || '';
+        const box = $('cabScore');
+        const shown = fmt(score);
+        if (box.textContent !== shown) {
+          box.textContent = shown;
+          const unit = box.nextElementSibling;
+          if (unit) unit.textContent = score === 1 ? 'Punkt' : 'Punkte';
+          // Ein kurzer Stups, wenn es wirklich etwas zu feiern gibt.
+          // Beim Sprint zählen die Meter laufend hoch – da wäre er Zappeln.
+          if (score - lastScore >= (gameId === 'runner' ? 5 : 1)) bumpScore();
+          lastScore = score;
+        }
+        const line = $('cabStatus');
+        const next = status || '';
+        if (line.textContent !== next) line.textContent = next;
       },
       onEnd(id, score) { finishRun(id, score); }
     });
@@ -519,7 +539,9 @@
     if (!arcade.start(gameId)) return;
     mode = 'playing';
     lastRun = null;
+    lastScore = 0;
     $('cabScore').textContent = '0';
+    $('cabScore').classList.remove('is-bump');
     $('cabStatus').textContent = '';
     renderArcade();
   }
@@ -565,7 +587,10 @@
     $('cabPar').textContent = `Richtwert: ${fmt(game.par)} Punkte`;
     $('cabKeys').innerHTML = keyHint(game.id);
 
-    $('gameList').innerHTML = P.ARCADE_GAMES.map((g) => `
+    $('gameList').innerHTML = P.ARCADE_GAMES.map((g) => {
+      const best = bestOf(g.id);
+      const ratio = Math.min(1, best / g.par);
+      return `
       <button class="game-card ${g.id === gameId ? 'is-on' : ''}" data-game="${g.id}">
         <span class="game-card-art">${I.build(g.icon, { size: 26 })}</span>
         <span class="game-card-main">
@@ -573,10 +598,14 @@
           <small>${g.desc}</small>
           <span class="game-card-meta">
             <span class="game-tag">${g.tag}</span>
-            <span class="game-best">Best: <b>${fmt(bestOf(g.id))}</b></span>
+            <span class="game-best">Best: <b>${fmt(best)}</b></span>
+          </span>
+          <span class="game-meter" title="Richtwert ${fmt(g.par)}">
+            <i class="${ratio >= 1 ? 'is-full' : ''}" style="width:${Math.round(ratio * 100)}%"></i>
           </span>
         </span>
-      </button>`).join('');
+      </button>`;
+    }).join('');
 
     $('parList').innerHTML = P.ARCADE_GAMES.map((g) => {
       const best = bestOf(g.id);
@@ -640,7 +669,7 @@
           : ''}
         <div class="result">
           <div><div class="result-val">${fmt(lastRun.score)}</div><div class="result-lbl">Punkte</div></div>
-          <div><div class="result-val">${fmt(Math.max(lastRun.best, lastRun.score))}</div><div class="result-lbl">Bestwert</div></div>
+          <div><div class="result-val result-val--muted">${fmt(Math.max(lastRun.best, lastRun.score))}</div><div class="result-lbl">Bestwert</div></div>
         </div>
         <p><span class="result-xp">${I.build('star', { tone: 'cream', size: 14 })} +${fmt(lastRun.xp)} XP</span></p>
         <div class="veil-actions">
