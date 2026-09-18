@@ -95,6 +95,18 @@ npm run dist:linux   # Linux    (AppImage)
 
 Die Pakete landen in `dist/`. Für die Entwicklung mit offenen DevTools: `npm run dev`.
 
+**Pakete automatisch bauen lassen:** Ein Versions-Etikett genügt –
+
+```bash
+git tag v1.2.0 && git push origin v1.2.0
+```
+
+Der Workflow `.github/workflows/pakete.yml` baut daraufhin auf je einem
+Windows-, macOS- und Linux-Läufer das passende Paket (Windows-Installer lassen
+sich nun einmal nicht unter Linux erzeugen), packt die Einzeldatei dazu und legt
+alles als **Entwurf einer Veröffentlichung** ab. Der Entwurf wartet auf einen
+Klick, bevor er sichtbar wird.
+
 ### Web-Version
 
 ```bash

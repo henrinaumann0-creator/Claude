@@ -1,0 +1,134 @@
+# Baut die Installationspakete für Windows, macOS und Linux und legt
+# sie als Entwurf einer Veröffentlichung ab. Ausgelöst wird das von
+# einem Versions-Etikett, zum Beispiel:
+#
+#   git tag v1.2.0 && git push origin v1.2.0
+#
+# Jedes System baut sein eigenes Paket – Windows-Installer lassen sich
+# nun einmal nicht unter Linux erzeugen.
+name: Pakete bauen
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  pakete:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows-Installer
+            os: windows-latest
+            befehl: npm run dist:win -- --publish never
+            ablage: dist/*.exe
+            artefakt: windows
+          - name: macOS-Abbild
+            os: macos-latest
+            befehl: npm run dist:mac -- --x64 --arm64 --publish never
+            ablage: dist/*.dmg
+            artefakt: macos
+          - name: Linux-AppImage
+            os: ubuntu-latest
+            befehl: npm run dist:linux -- --publish never
+            ablage: dist/*.AppImage
+            artefakt: linux
+    steps:
+      - name: Quelltext holen
+        uses: actions/checkout@v4
+
+      - name: Node einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Abhängigkeiten installieren
+        run: npm ci
+
+      - name: Paket bauen
+        run: ${{ matrix.befehl }}
+        env:
+          # Ohne Zertifikat wird nicht signiert – sonst bricht der Bau ab.
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+      - name: Paket hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: claude-pets-${{ matrix.artefakt }}
+          path: ${{ matrix.ablage }}
+          if-no-files-found: error
+          retention-days: 30
+
+  einzeldatei:
+    name: Einzeldatei
+    runs-on: ubuntu-latest
+    steps:
+      - name: Quelltext holen
+        uses: actions/checkout@v4
+
+      - name: Node einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Einzeldatei bauen
+        run: node build/build-single.js
+
+      - name: Einzeldatei hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: claude-pets-einzeldatei
+          path: dist-single/claude-pets.html
+          if-no-files-found: error
+          retention-days: 30
+
+  veroeffentlichen:
+    name: Entwurf der Veröffentlichung
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [pakete, einzeldatei]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pakete einsammeln
+        uses: actions/download-artifact@v4
+        with:
+          path: pakete
+
+      - name: Inhalt anzeigen
+        run: find pakete -type f -exec ls -lh {} +
+
+      - name: Entwurf anlegen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          mapfile -t dateien < <(find pakete -type f | sort)
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft \
+            --title "Claude Pets $TAG" \
+            --notes "$(cat <<'TEXT'
+          Fertige Pakete für alle drei Systeme – dazu die Web-Version als
+          einzelne HTML-Datei.
+
+          | Datei | Für wen |
+          | --- | --- |
+          | `Claude Pets Setup *.exe` | Windows – Installer, danach im Startmenü |
+          | `Claude Pets-*.dmg` | macOS – Abbild öffnen, App in den Programme-Ordner ziehen |
+          | `Claude Pets-*.AppImage` | Linux – ausführbar machen und starten |
+          | `claude-pets.html` | alles in einer Datei: doppelklicken, läuft im Browser |
+
+          Die Pakete sind nicht signiert. Windows zeigt deshalb beim ersten
+          Start "Computer geschützt" → *Weitere Informationen* → *Trotzdem
+          ausführen*. macOS: Rechtsklick auf die App → *Öffnen*.
+          TEXT
+          )" \
+            "${dateien[@]}"
