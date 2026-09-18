@@ -15,6 +15,11 @@ on:
   workflow_dispatch:
   # Von pakete-probe.yml aufgerufen, um die Pakete ohne Etikett zu prüfen.
   workflow_call:
+    inputs:
+      veroeffentlichen:
+        description: "Auch einen Entwurf der Veröffentlichung anlegen"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -94,10 +99,13 @@ jobs:
 
   veroeffentlichen:
     name: Entwurf der Veröffentlichung
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.veroeffentlichen
     needs: [pakete, einzeldatei]
     runs-on: ubuntu-latest
     steps:
+      - name: Quelltext holen
+        uses: actions/checkout@v4
+
       - name: Pakete einsammeln
         uses: actions/download-artifact@v4
         with:
@@ -109,14 +117,31 @@ jobs:
       - name: Entwurf anlegen
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
+
+          # Ohne Etikett nimmt die Veröffentlichung die Version aus
+          # package.json; das Etikett legt gh dann selbst am aktuellen
+          # Stand an.
+          case "$GITHUB_REF" in
+            refs/tags/v*) version="${GITHUB_REF#refs/tags/}" ;;
+            *)            version="v$(node -p "require('./package.json').version")" ;;
+          esac
+          echo "Veröffentlichung: $version"
+
           mapfile -t dateien < <(find pakete -type f | sort)
-          gh release create "$TAG" \
+
+          # Gibt es sie schon, werden nur die Dateien ausgetauscht.
+          if gh release view "$version" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$version" --repo "$GITHUB_REPOSITORY" --clobber "${dateien[@]}"
+            exit 0
+          fi
+
+          gh release create "$version" \
             --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
             --draft \
-            --title "Claude Pets $TAG" \
+            --title "Claude Pets $version" \
             --notes "$(cat <<'TEXT'
           Fertige Pakete für alle drei Systeme – dazu die Web-Version als
           einzelne HTML-Datei.

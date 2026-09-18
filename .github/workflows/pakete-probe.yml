@@ -22,3 +22,7 @@ jobs:
   probelauf:
     name: Pakete bauen
     uses: ./.github/workflows/pakete.yml
+    with:
+      # Steht [release] in der Commit-Nachricht, wandern die Pakete
+      # zusätzlich in den Entwurf einer Veröffentlichung.
+      veroeffentlichen: ${{ contains(github.event.head_commit.message, '[release]') }}

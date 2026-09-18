@@ -107,6 +107,11 @@ sich nun einmal nicht unter Linux erzeugen), packt die Einzeldatei dazu und legt
 alles als **Entwurf einer Veröffentlichung** ab. Der Entwurf wartet auf einen
 Klick, bevor er sichtbar wird.
 
+Ohne Etikett geht es auch: `.github/workflows/pakete-probe.yml` stößt denselben
+Bau bei Änderungen an der Paketierung an und hängt die Pakete an den Lauf.
+Steht zusätzlich `[release]` in der Commit-Nachricht, entsteht daraus ebenfalls
+ein Entwurf – die Versionsnummer kommt dann aus `package.json`.
+
 ### Web-Version
 
 ```bash
