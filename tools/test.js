@@ -176,6 +176,59 @@ async function drag(cdp, x0, y0, x1, y1, steps){
     allErrs.push(...errs); await ctx.close();
   }
 
+  // ---- 5b Keine Weichzeichner, kein Glow, keine Verläufe ------------------
+  {
+    const {ctx, page, errs} = await newPage(browser, 820, 1180, 2);
+    const src = fs.readFileSync(path.join(__dirname, '..', 'swingby.html'), 'utf8');
+    const verboten = [
+      ['CSS-Filter', /filter\s*:\s*(?!none)[a-z]/i],
+      ['Canvas-Filter', /\.filter\s*=/],
+      ['Schattenweichzeichnung', /shadowBlur/],
+      ['Schattenfarbe', /shadowColor/],
+      ['linearer Verlauf', /createLinearGradient/],
+      ['radialer Verlauf', /createRadialGradient/],
+      ['CSS-Verlauf', /linear-gradient|radial-gradient/],
+      ['backdrop-filter', /backdrop-filter/]
+    ];
+    const treffer = verboten.filter(([, re]) => re.test(src)).map(([n]) => n);
+    ok('5b Quelltext ohne Weichzeichner, Glow oder Verläufe',
+       treffer.length === 0, treffer.length ? treffer.join(', ') : 'keine Fundstellen');
+
+    // Laufzeit: Zeichenzustand muss neutral sein, Hintergrundebene 1:1 gesetzt
+    const st = await page.evaluate(() => {
+      const g = document.getElementById('cv').getContext('2d');
+      return {filter:g.filter, blur:g.shadowBlur, alpha:g.globalAlpha,
+              smooth:g.imageSmoothingEnabled};
+    });
+    ok('5b Zeichenzustand neutral (kein Filter, kein Schatten, volle Deckkraft)',
+       (st.filter === 'none' || st.filter === undefined) && st.blur === 0 && st.alpha === 1,
+       `filter=${st.filter} shadowBlur=${st.blur} globalAlpha=${st.alpha}`);
+
+    // Flächen müssen flach sein: wenige verschiedene Farben auf einem Körper
+    await page.evaluate(() => SB.go(0));
+    await page.waitForTimeout(250);
+    const tones = await page.evaluate(() => {
+      const cv = document.getElementById('cv'), g = cv.getContext('2d');
+      const s = SB.state();
+      const R = Math.round(15 * s.sc), cx = Math.round(s.ox), cy = Math.round(s.oy);
+      const d = g.getImageData(cx - R, cy - R, R * 2, R * 2).data;
+      const seen = {};
+      for (let i = 0; i < d.length; i += 4) {
+        const k = d[i] + ',' + d[i+1] + ',' + d[i+2];
+        seen[k] = (seen[k] || 0) + 1;
+      }
+      const all = Object.entries(seen).sort((a, b) => b[1] - a[1]);
+      const total = all.reduce((a, b) => a + b[1], 0);
+      const top8 = all.slice(0, 8).reduce((a, b) => a + b[1], 0);
+      return {unique:all.length, deckung:top8 / total};
+    });
+    ok('5b Planetenflächen sind flach, kein Verlauf',
+       tones.deckung > 0.80,
+       `acht Haupttöne decken ${(tones.deckung*100).toFixed(1)} % der Scheibe ab ` +
+       `(${tones.unique} Farbwerte insgesamt, Rest ist Kantenglättung)`);
+    allErrs.push(...errs); await ctx.close();
+  }
+
   // ---- 6  Touch, Drehen, Größenänderung im Flug ---------------------------
   {
     const {ctx, page, errs, cdp} = await newPage(browser, 820, 1180, 2);

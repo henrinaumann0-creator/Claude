@@ -373,7 +373,10 @@ prepLevels();
 
 var ACC = '#6fd3e8';          // Sonde, Vorschau, Spur
 var GOL = '#e8a33d';          // Ziel und Messpunkte
-var LX = -0.54, LY = -0.84;   // Lichtrichtung
+// Licht als 3D-Richtung: x/y in der Bildebene, z zum Betrachter. Daraus
+// ergibt sich die Terminator-Ellipse einer Kugel exakt.
+var L3X = -0.4907, L3Y = -0.7634, L3Z = 0.42;
+var LU = Math.atan2(L3Y, L3X);   // Winkel der projizierten Lichtrichtung
 
 var cv = document.getElementById('cv');
 var ctx = cv.getContext('2d', {alpha:false, desynchronized:false});
@@ -399,15 +402,26 @@ function shade(hex, f){
 for (var _i = 0; _i < LEVELS.length; _i++) {
   var _bs = LEVELS[_i].bodies;
   for (var _k = 0; _k < _bs.length; _k++) {
-    _bs[_k].dark = shade(_bs[_k].col, 0.30);
-    _bs[_k].rim = shade(_bs[_k].col, 1.18);
+    var _b = _bs[_k], _soft = _b.t === 's';
+    _b.seed = _i * 37 + _k * 101 + 11;
+    _b.dark = shade(_b.col, 0.30);          // Nachtseite
+    _b.twi  = shade(_b.col, 0.55);          // schmales Dämmerungsband
+    _b.rim  = shade(_b.col, 1.18);          // Scheibenrand
+    _b.f1   = shade(_b.col, _soft ? 0.88 : 0.78);   // Merkmal, Tagseite
+    _b.f0   = shade(_b.col, _soft ? 0.27 : 0.23);   // Merkmal, Nachtseite
+    _b.fr1  = shade(_b.col, 1.14);          // Kraterrand, Tagseite
+    _b.fr0  = shade(_b.col, 0.42);          // Kraterrand, Nachtseite
   }
 }
 
 // Höhenlinien-Leiter des Potentials (geometrisch gestaffelt)
 var CLEV = [];
 (function(){ for (var v = 13; v < 1200; v *= 1.30) CLEV.push(v); })();
-function clevAlpha(i){ return 0.12 + 0.30 * (i / (CLEV.length - 1)); }
+function clevAlpha(i){
+  var a = 0.095 + 0.215 * (i / (CLEV.length - 1));
+  if (i % 4 === 0) a *= 1.9;               // Leitlinie
+  return a > 0.52 ? 0.52 : a;
+}
 
 function mulberry32(a){
   return function(){
@@ -454,10 +468,21 @@ function buildField(){
   var us = Math.round(dpr / 2); if (us < 1) us = 1;
   for (var i = 0; i < n; i++) {
     var x = Math.floor(rnd() * W), y = Math.floor(rnd() * H);
-    var big = rnd() > 0.965 ? 2 : 1;
+    var q = rnd();
     var a = 0.14 + 0.66 * Math.pow(rnd(), 1.9);
-    g.fillStyle = 'rgba(186,198,206,' + a.toFixed(3) + ')';
-    g.fillRect(x, y, big * us, big * us);
+    var tn = rnd();
+    var cr = tn < 0.20 ? '174,192,212' : (tn > 0.88 ? '214,198,176' : '194,202,208');
+    var sz = (q > 0.968 ? 2 : 1) * us;
+    g.fillStyle = 'rgba(' + cr + ',' + a.toFixed(3) + ')';
+    g.fillRect(x, y, sz, sz);
+    if (q > 0.9955) {           // die hellsten bekommen ein hartes Kreuz
+      var o = (sz - us) >> 1, L2 = 2 * us;
+      g.fillStyle = 'rgba(' + cr + ',' + (a * 0.42).toFixed(3) + ')';
+      g.fillRect(x - L2, y + o, L2, us);
+      g.fillRect(x + sz, y + o, L2, us);
+      g.fillRect(x + o, y - L2, us, L2);
+      g.fillRect(x + o, y + sz, us, L2);
+    }
   }
 
   var lv = LEVELS[cur], st = [], k;
@@ -505,10 +530,32 @@ function buildField(){
       marching(g, F, nx, ny, SP, lev, i0, i1, j0, j1);
     }
   }
+  // Feste Bahnen der bewegten Körper: statisch, also einmal mitgebacken.
+  var seen = {};
+  for (k = 0; k < lv.bodies.length; k++) {
+    var ob = lv.bodies[k].orb;
+    if (!ob) continue;
+    var key = ob.cx + '|' + ob.cy + '|' + ob.rx + '|' + ob.ry;
+    if (seen[key]) continue;
+    seen[key] = 1;
+    track(g, ob, 'rgba(146,174,190,0.17)');
+  }
+  if (lv.goal.orb) track(g, lv.goal.orb, 'rgba(232,163,61,0.20)');
+
   for (k = 0; k < lv.bodies.length; k++) {
     var bb = lv.bodies[k];
     if (!bb.moving) drawBody(g, bb, X(bb.x), Y(bb.y));
   }
+}
+
+function track(g, ob, col){
+  g.strokeStyle = col;
+  g.lineWidth = 1;
+  g.setLineDash([Math.round(3 * dpr), Math.round(5 * dpr)]);
+  g.beginPath();
+  g.ellipse(X(ob.cx), Y(ob.cy), ob.rx * sc, ob.ry * sc, 0, 0, TAU);
+  g.stroke();
+  g.setLineDash([]);
 }
 
 function marching(g, F, nx, ny, SP, L, i0, i1, j0, j1){
@@ -554,6 +601,74 @@ function movingRings(g, b, px, py){
   }
 }
 
+// Oberflächenmerkmale: Punkte auf der Einheitskugel, einmal je Körper
+// ausgewürfelt und danach fest. z zeigt zum Betrachter.
+function feats(b){
+  if (b._f) return b._f;
+  var rnd = mulberry32(1013 + (b.seed | 0) * 7919);
+  var soft = b.t === 's';
+  var n = soft ? 5 : 8 + Math.floor(rnd() * 5);
+  var out = [];
+  for (var i = 0; i < n; i++) {
+    var u = rnd() * 2 - 1, th = rnd() * TAU, q = Math.sqrt(1 - u * u);
+    out.push({ x:q * Math.cos(th), y:q * Math.sin(th), z:u,
+               r:soft ? 0.22 + rnd() * 0.20 : 0.09 + rnd() * 0.15 });
+  }
+  b._f = out;
+  return out;
+}
+
+// Die Merkmale werden zum Rand hin gestaucht (Kugelperspektive) und nach der
+// Lichtrichtung eingefärbt, damit sie zur Tag-Nacht-Grenze passen.
+function drawFeats(g, b, px, py, R){
+  var f = feats(b), soft = b.t === 's', i;
+  for (i = 0; i < f.length; i++) {
+    var c = f[i];
+    if (c.z < 0.12) continue;                    // Rückseite oder zu flach
+    var ry = c.r * R, rx = ry * c.z;
+    if (ry < 1.6 || rx < 0.6) continue;          // zu klein, wuerde matschen
+    var rad = Math.atan2(c.y, c.x);
+    var cx = px + c.x * R, cy = py + c.y * R;
+    var lit = (c.x * L3X + c.y * L3Y + c.z * L3Z) > 0;
+    g.fillStyle = lit ? b.f1 : b.f0;
+    g.beginPath(); g.ellipse(cx, cy, rx, ry, rad, 0, TAU); g.fill();
+    if (!soft && rx > 1.8) {                     // heller Kraterrand zum Licht
+      g.strokeStyle = lit ? b.fr1 : b.fr0;
+      g.lineWidth = 1;
+      g.beginPath();
+      g.ellipse(cx, cy, rx, ry, rad, LU - rad - Math.PI / 2, LU - rad + Math.PI / 2);
+      g.stroke();
+    }
+  }
+}
+
+// Beleuchtete Fläche einer Kugel: halber Scheibenrand plus halbe
+// Terminator-Ellipse. Der Versatz der Ellipse ist R*|lz|.
+function litPath(g, px, py, R, k){
+  g.beginPath();
+  g.arc(px, py, R, LU - Math.PI / 2, LU + Math.PI / 2);
+  g.ellipse(px, py, R * k, R, LU, Math.PI / 2, Math.PI * 1.5);
+  g.closePath();
+}
+
+function rockPath(g, b, px, py, R){
+  var f = b._r;
+  if (!f) {
+    var rnd = mulberry32(3001 + (b.seed | 0) * 7919);
+    var n = 7 + Math.floor(rnd() * 3);
+    f = [rnd() * TAU];                       // erster Eintrag: eigene Drehung
+    for (var j = 0; j < n; j++) f.push(0.74 + rnd() * 0.26);
+    b._r = f;
+  }
+  g.beginPath();
+  for (var i = 1; i < f.length; i++) {
+    var th = f[0] + TAU * (i - 1) / (f.length - 1);
+    var x = px + Math.cos(th) * R * f[i], y = py + Math.sin(th) * R * f[i];
+    if (i === 1) g.moveTo(x, y); else g.lineTo(x, y);
+  }
+  g.closePath();
+}
+
 function drawBody(g, b, px, py){
   var R = b.rc * sc;
   if (b.t === 'h') {
@@ -564,20 +679,38 @@ function drawBody(g, b, px, py){
     g.beginPath(); g.arc(px, py, R * 1.5, 0, TAU); g.stroke();
     return;
   }
-  if (b.t === 'r') {
-    g.fillStyle = b.dark;
-    g.beginPath(); g.arc(px, py, R, 0, TAU); g.fill();
-    g.strokeStyle = b.col; g.lineWidth = lw(0.8);
-    g.beginPath(); g.arc(px, py, R - lw(0.8) / 2, 0, TAU); g.stroke();
+  if (b.t === 'r') {                             // Trümmer: kantige Silhouette
+    rockPath(g, b, px, py, R);
+    g.fillStyle = b.dark; g.fill();
+    g.save(); g.clip();
+    var ux = Math.cos(LU), uy = Math.sin(LU), vx = -uy, vy = ux;
+    var o = -R * 0.22, D = R * 3;
+    var bx = px + ux * o, by = py + uy * o;
+    g.fillStyle = b.col;
+    g.beginPath();
+    g.moveTo(bx + vx * D, by + vy * D);
+    g.lineTo(bx - vx * D, by - vy * D);
+    g.lineTo(bx - vx * D + ux * D, by - vy * D + uy * D);
+    g.lineTo(bx + vx * D + ux * D, by + vy * D + uy * D);
+    g.closePath(); g.fill();
+    g.restore();
+    rockPath(g, b, px, py, R);
+    g.strokeStyle = b.rim; g.lineWidth = 1; g.stroke();
     return;
   }
+  // Nachtseite, Dämmerungsband, Tagseite: drei harte Tonstufen, kein Verlauf.
   g.fillStyle = b.dark;
   g.beginPath(); g.arc(px, py, R, 0, TAU); g.fill();
   g.save();
   g.beginPath(); g.arc(px, py, R, 0, TAU); g.clip();
-  var d = 1.3 * R, R2 = Math.sqrt(R * R + d * d);
+  var band = Math.max(1.5, R * 0.11) / R;
+  g.fillStyle = b.twi;
+  litPath(g, px, py, R, Math.min(0.97, L3Z + band));
+  g.fill();
   g.fillStyle = b.col;
-  g.beginPath(); g.arc(px + LX * d, py + LY * d, R2, 0, TAU); g.fill();
+  litPath(g, px, py, R, L3Z);
+  g.fill();
+  drawFeats(g, b, px, py, R);
   g.restore();
   g.strokeStyle = b.rim;
   g.lineWidth = lw(0.8);
@@ -596,15 +729,35 @@ function poly(g, a){
   g.stroke();
 }
 
+// Spur in Stufen: hinten blass, vorn kräftig. Zeigt die Flugrichtung.
+function fadePoly(g, a, maxA){
+  var n = a.length >> 1;
+  if (n < 3) return;
+  var seg = 7;
+  g.lineWidth = lw(1);
+  for (var s = 0; s < seg; s++) {
+    var i0 = Math.floor(n * s / seg), i1 = Math.floor(n * (s + 1) / seg);
+    if (i1 - i0 < 1) continue;
+    if (s > 0) i0--;                         // überlappen, sonst bleiben Lücken
+    var al = maxA * (0.18 + 0.82 * (s + 1) / seg);
+    g.strokeStyle = 'rgba(111,211,232,' + al.toFixed(3) + ')';
+    g.beginPath(); g.moveTo(X(a[i0 * 2]), Y(a[i0 * 2 + 1]));
+    for (var i = i0 + 1; i <= i1 && i < n; i++) g.lineTo(X(a[i * 2]), Y(a[i * 2 + 1]));
+    g.stroke();
+  }
+}
+
 function render(){
   var g = ctx, lv = LEVELS[cur], i, b, t = w.tick * DT;
   g.setTransform(1, 0, 0, 1, 0, 0);
   g.drawImage(fc, 0, 0);
 
-  // Spielfeldrand
-  g.strokeStyle = 'rgba(120,140,152,0.13)';
+  // Spielfeldrand: gestrichelt, damit er als Grenze und nicht als Zierde liest
+  g.strokeStyle = 'rgba(120,140,152,0.20)';
   g.lineWidth = 1;
+  g.setLineDash([Math.round(2 * dpr), Math.round(7 * dpr)]);
   g.beginPath(); g.arc(ox, oy, R_OUT * sc, 0, TAU); g.stroke();
+  g.setLineDash([]);
 
   // bewegte Körper mit mitlaufenden Höhenlinien
   for (i = 0; i < lv.bodies.length; i++) {
@@ -617,12 +770,8 @@ function render(){
   }
 
   // Spuren
-  if (ghost && ghost.length > 3) {
-    g.strokeStyle = 'rgba(111,211,232,0.13)'; g.lineWidth = lw(1); poly(g, ghost);
-  }
-  if (trail.length > 3) {
-    g.strokeStyle = 'rgba(111,211,232,0.42)'; g.lineWidth = lw(1); poly(g, trail);
-  }
+  if (ghost && ghost.length > 3) fadePoly(g, ghost, 0.16);
+  if (trail.length > 3) fadePoly(g, trail, 0.52);
 
   // Messpunkte
   for (i = 0; i < lv.cps.length; i++) {
@@ -643,6 +792,15 @@ function render(){
   g.beginPath(); g.arc(gx, gy, gr - lw(1.6) / 2, 0, TAU); g.stroke();
   g.strokeStyle = 'rgba(232,163,61,0.42)'; g.lineWidth = lw(1);
   g.beginPath(); g.arc(gx, gy, gr * 0.44, 0, TAU); g.stroke();
+  g.strokeStyle = 'rgba(232,163,61,0.55)'; g.lineWidth = 1;
+  var m0 = gr * 1.30, m1 = gr * 1.66;
+  for (i = 0; i < 4; i++) {
+    var mn = i * Math.PI / 2 + Math.PI / 4, mc = Math.cos(mn), ms = Math.sin(mn);
+    g.beginPath();
+    g.moveTo(gx + mc * m0, gy + ms * m0);
+    g.lineTo(gx + mc * m1, gy + ms * m1);
+    g.stroke();
+  }
 
   // Zielvorschau beim Spannen
   if (drag && w.st === 'aim') {
@@ -652,8 +810,9 @@ function render(){
       g.fillStyle = ACC;
       var pr = Math.max(1.4, 1.7 * dpr);
       for (i = 0; i < prevPts.length; i += 2) {
-        g.globalAlpha = 0.80 - 0.55 * (i / Math.max(2, prevPts.length));
-        dot(g, X(prevPts[i]), Y(prevPts[i + 1]), pr);
+        var pf = i / Math.max(2, prevPts.length);
+        g.globalAlpha = 0.88 - 0.60 * pf;
+        dot(g, X(prevPts[i]), Y(prevPts[i + 1]), pr * (1 - 0.34 * pf));
       }
       g.globalAlpha = 1;
       var sx = X(w.x), sy = Y(w.y), L = 26 * sc * ai.pow;
@@ -673,8 +832,12 @@ function render(){
       g.beginPath(); g.moveTo(wx, wy);
       g.lineTo(wx - dx / dl * 13 * sc, wy - dy / dl * 13 * sc); g.stroke();
     }
+    if (w.st === 'fly') {
+      g.strokeStyle = 'rgba(111,211,232,0.30)'; g.lineWidth = 1;
+      g.beginPath(); g.arc(wx, wy, Math.max(5, 6 * dpr), 0, TAU); g.stroke();
+    }
     g.fillStyle = w.st === 'dead' ? 'rgba(111,211,232,0.35)' : ACC;
-    dot(g, wx, wy, Math.max(2, 2.7 * dpr));
+    dot(g, wx, wy, Math.max(2, 2.6 * dpr));
   }
 }
 
