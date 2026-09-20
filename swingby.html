@@ -1,0 +1,1011 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#000000">
+<title>Swing-by</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
+html,body{width:100%;height:100%;background:#000;overflow:hidden;touch-action:none;overscroll-behavior:none;-webkit-text-size-adjust:100%}
+body{font:500 13px/1.15 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;color:#8f979c;letter-spacing:.01em}
+#cv{position:fixed;left:0;top:0;width:100%;height:100%;display:block;background:#000}
+#ui{position:fixed;left:0;top:0;right:0;bottom:0;pointer-events:none;
+  padding:calc(env(safe-area-inset-top,0px) + 10px) calc(env(safe-area-inset-right,0px) + 12px) calc(env(safe-area-inset-bottom,0px) + 10px) calc(env(safe-area-inset-left,0px) + 12px)}
+#badge{position:absolute;left:calc(env(safe-area-inset-left,0px) + 12px);top:calc(env(safe-area-inset-top,0px) + 10px);
+  min-width:30px;height:26px;padding:0 8px;display:flex;align-items:center;justify-content:center;
+  font-size:14px;font-weight:600;color:#a7b0b5;background:#0c0f11;border:1px solid #1d2428;border-radius:6px;pointer-events:auto}
+#tools{position:absolute;right:calc(env(safe-area-inset-right,0px) + 12px);top:calc(env(safe-area-inset-top,0px) + 10px);display:flex;gap:6px}
+.ic{width:30px;height:26px;display:flex;align-items:center;justify-content:center;background:#0c0f11;border:1px solid #1d2428;border-radius:6px;color:#8f979c;pointer-events:auto;cursor:pointer}
+.ic:active{background:#141a1d}
+.ic svg{width:15px;height:15px;display:block}
+#fuelwrap{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 14px);
+  width:118px;height:3px;background:#161c20;border-radius:2px;overflow:hidden;opacity:0;transition:opacity .18s linear}
+#fuelwrap.on{opacity:1}
+#fuel{height:100%;width:100%;background:#6fd3e8;transform-origin:left center}
+#win{position:absolute;left:0;top:0;right:0;bottom:0;display:none;align-items:center;justify-content:center;flex-direction:column;gap:0}
+#win.on{display:flex}
+#stars{display:flex;gap:10px;opacity:0;transform:scale(.96);transition:opacity .28s ease-out,transform .28s ease-out}
+#win.show #stars{opacity:1;transform:scale(1)}
+#stars svg{width:26px;height:26px;display:block}
+.st-off{fill:none;stroke:#3a4247;stroke-width:1.4}
+.st-on{fill:#e8a33d;stroke:none}
+#grid{position:absolute;left:0;top:0;right:0;bottom:0;background:#000000ee;display:none;align-items:center;justify-content:center;pointer-events:auto}
+#grid.on{display:flex}
+#gwrap{display:grid;grid-template-columns:repeat(4,64px);gap:9px}
+@media (max-aspect-ratio:1/1){#gwrap{grid-template-columns:repeat(3,64px)}}
+.cell{width:64px;height:56px;background:#0b0e10;border:1px solid #1d2428;border-radius:7px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;cursor:pointer;color:#a7b0b5}
+.cell:active{background:#141a1d}
+.cell b{font-size:15px;font-weight:600}
+.cell i{display:flex;gap:3px}
+.cell svg{width:9px;height:9px;display:block}
+#diag{position:absolute;left:calc(env(safe-area-inset-left,0px) + 12px);top:calc(env(safe-area-inset-top,0px) + 42px);
+  display:none;padding:5px 7px;background:#0c0f11;border:1px solid #1d2428;border-radius:5px;font-size:11px;color:#7e868b;white-space:pre}
+#diag.on{display:block}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div id="ui">
+  <div id="badge">1</div>
+  <div id="tools">
+    <button class="ic" id="bGrid" aria-label="Levelauswahl"><svg viewBox="0 0 16 16" aria-hidden="true"><g fill="currentColor"><rect x="1.5" y="1.5" width="5" height="5" rx="1"/><rect x="9.5" y="1.5" width="5" height="5" rx="1"/><rect x="1.5" y="9.5" width="5" height="5" rx="1"/><rect x="9.5" y="9.5" width="5" height="5" rx="1"/></g></svg></button>
+    <button class="ic" id="bRes" aria-label="Neustart"><svg viewBox="0 0 16 16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M13.2 8a5.2 5.2 0 1 1-1.6-3.75"/><path d="M13.4 1.9v3.1h-3.1"/></g></svg></button>
+    <button class="ic" id="bSnd" aria-label="Ton"><svg viewBox="0 0 16 16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><path d="M3 6h2.4L8.6 3.2v9.6L5.4 10H3z" fill="currentColor"/><g id="sndOn"><path d="M10.7 6.1a2.6 2.6 0 0 1 0 3.8"/><path d="M12.6 4.4a5 5 0 0 1 0 7.2"/></g><g id="sndOff" style="display:none"><path d="M11 6.2l3.2 3.6M14.2 6.2L11 9.8"/></g></g></svg></button>
+  </div>
+  <div id="fuelwrap"><div id="fuel"></div></div>
+  <div id="win"><div id="stars"></div></div>
+  <div id="grid"><div id="gwrap"></div></div>
+  <div id="diag"></div>
+</div>
+<script>
+"use strict";
+/*<<CORE>>*/
+// ---------------------------------------------------------------------------
+// Swing-by :: Simulationskern. Rein numerisch, ohne DOM. Wird vom Spiel und
+// (per Textextraktion) von den Testskripten identisch benutzt.
+// ---------------------------------------------------------------------------
+var DT = 1 / 240;          // fester Physikschritt
+var VMAX = 30;             // maximale Startgeschwindigkeit (Einheiten/s)
+var THRUST_A = 14;         // Schubbeschleunigung (Einheiten/s^2)
+var R_OUT = 100;           // Spielfeldradius
+var FIT_R = 107;           // Radius, der immer sichtbar ist
+var GOAL_R = 5.2;
+var CP_R = 3.8;
+var MIN_POW = 0.12;
+var TAU = Math.PI * 2;
+
+/*<<SOL>>*/
+// Referenzlösungen (3 Sterne) und Messpunkte. Vom Selbsttest geprüft.
+var SOLS = {
+  1:{sol:{t0:0,a:20.91,v:0.3398},
+     cps:[{x:-45.385,y:51.014},{x:0.332,y:56.537},{x:45.948,y:49.598}]},
+  2:{sol:{t0:0,a:2.79,v:0.2588},
+     cps:[{x:-40.961,y:42.763},{x:14.28,y:21.561},{x:43.12,y:-35.229}]},
+  3:{sol:{t0:0,a:347.36,v:0.303},
+     cps:[{x:-38.652,y:31.421},{x:-25.699,y:-3.012},{x:-39.669,y:-35.801}]},
+  4:{sol:{t0:0,a:321.3,v:0.58,th:[{t0:1.75,t1:3.55,x:424.264,y:424.264}]},
+     cps:[{x:15.606,y:-28.238},{x:28.551,y:-14.227},{x:55.428,y:19.145}]},
+  5:{sol:{t0:617,a:289.79,v:0.303},
+     cps:[{x:-55.742,y:13.202},{x:-11.313,y:-39.63},{x:38.263,y:-60.156}]},
+  6:{sol:{t0:0,a:82.04,v:0.3072},
+     cps:[{x:-67.371,y:-1.864},{x:-24.71,y:45.875},{x:37.696,y:56.936}]},
+  7:{sol:{t0:0,a:249.33,v:0.2752},
+     cps:[{x:-66.707,y:-5.738},{x:11.365,y:-45.262},{x:74.948,y:16.096}]},
+  8:{sol:{t0:0,a:296.42,v:0.3188},
+     cps:[{x:-59.278,y:5.869},{x:1.095,y:-28.298},{x:60.083,y:7.149}]},
+  9:{sol:{t0:0,a:7.18,v:0.3368},
+     cps:[{x:-33.886,y:-48.961},{x:20.927,y:-26.075},{x:58.329,y:19.359}]},
+  10:{sol:{t0:2229,a:293.61,v:0.3},
+     cps:[{x:-62.411,y:20.533},{x:-32.013,y:-18.395},{x:18.907,y:-39.93}]},
+  11:{sol:{t0:0,a:366.9,v:0.9,th:[{t0:1.32,t1:2.92,x:290.886,y:-524.772}]},
+     cps:[{x:14.626,y:-23.063},{x:37.066,y:-25.04},{x:60.853,y:-34.145}]},
+  12:{sol:{t0:3017,a:292.67,v:0.4294},
+     cps:[{x:-57.339,y:8.347},{x:-13.292,y:-33.327},{x:44.481,y:-8.889}]}
+};
+/*<</SOL>>*/
+
+// Level sind reine Datenobjekte. Felder:
+//   start {x,y}          Startpunkt der Sonde (Weltkoordinaten, Feldradius 100)
+//   goal  {x,y}          Zielring; mit orb:{cx,cy,rx,ry,T,p} wandert er mit
+//   bodies[]             t:'p' Planet, 's' Stern, 'm' Mond, 'h' Loch, 'r' Brocken
+//                        mu Schwereparameter (0 = nur tödlich), rc Trefferradius,
+//                        soft Weichzeichnung (Vorgabe rc*0.85), col Grundfarbe,
+//                        x/y fest oder orb:{cx,cy,rx,ry,T,p} als feste Bahn
+//   fuel                 Sekunden Schub (0 = kein Schub in diesem Level)
+//   vcap                 Deckel der Abschussstärke (1 = voll)
+//   tmax                 Zeitlimit in Sekunden
+// Messpunkte und Referenzlösung stehen in SOLS, erzeugt von tools/solve.js.
+var LEVELS = [
+{ id:1, fuel:0, tmax:30,
+  start:{x:-80,y:40}, goal:{x:80,y:40},
+  bodies:[{t:'p',x:0,y:0,mu:3000,rc:14,col:'#7a6a55'}] },
+
+{ id:2, fuel:0, tmax:32,
+  start:{x:-80,y:44}, goal:{x:42,y:-76},
+  bodies:[{t:'p',x:-2,y:-8,mu:3200,rc:15,col:'#5f6f6a'}] },
+
+{ id:3, fuel:0, tmax:34,
+  start:{x:-64,y:46}, goal:{x:-64,y:-46},
+  bodies:[{t:'p',x:-64,y:0,mu:4200,rc:17,col:'#6d6472'}] },
+
+{ id:4, fuel:1.8, tmax:34, vcap:0.30,
+  start:{x:0,y:-32}, goal:{x:76,y:52},
+  bodies:[{t:'p',x:0,y:0,mu:2600,rc:14,col:'#6b5f55'}] },
+
+{ id:5, fuel:0.6, tmax:36,
+  start:{x:-76,y:58}, goal:{x:72,y:-58},
+  bodies:[{t:'p',x:0,y:0,mu:2000,rc:13,col:'#5c6673'},
+          {t:'m',mu:900,rc:8,col:'#7b756a',orb:{cx:0,cy:0,rx:44,ry:44,T:9,p:0}}] },
+
+{ id:6, fuel:0.6, tmax:36,
+  start:{x:-80,y:-46}, goal:{x:80,y:46},
+  bodies:[{t:'s',mu:2300,rc:12,col:'#8a7452',orb:{cx:0,cy:0,rx:23,ry:23,T:11,p:0}},
+          {t:'s',mu:2300,rc:12,col:'#6a7280',orb:{cx:0,cy:0,rx:23,ry:23,T:11,p:Math.PI}}] },
+
+{ id:7, fuel:0.6, tmax:34,
+  start:{x:-70,y:60}, goal:{x:68,y:64},
+  bodies:[{t:'p',x:-36,y:10,mu:2700,rc:14,col:'#6b5f55'},
+          {t:'p',x:34,y:-16,mu:2700,rc:14,col:'#56666a'}] },
+
+{ id:8, fuel:0.6, tmax:34,
+  start:{x:-82,y:42}, goal:{x:82,y:42},
+  bodies:[{t:'h',x:0,y:0,mu:5200,rc:7,soft:4.2,col:'#000000'}] },
+
+{ id:9, fuel:0.6, tmax:38,
+  start:{x:-76,y:-56}, goal:{x:76,y:56},
+  bodies:[{t:'p',x:0,y:0,mu:2600,rc:14,col:'#6f6152'}] },
+
+{ id:10, fuel:0.6, tmax:38,
+  start:{x:-78,y:52}, goal:{x:0,y:0,orb:{cx:0,cy:0,rx:64,ry:64,T:13,p:0}},
+  bodies:[{t:'p',x:0,y:0,mu:3000,rc:15,col:'#5f6b63'}] },
+
+{ id:11, fuel:1.6, tmax:36, vcap:0.38,
+  start:{x:0,y:-30}, goal:{x:78,y:-44},
+  bodies:[{t:'h',x:0,y:0,mu:4000,rc:7,soft:4.2,col:'#000000'},
+          {t:'p',x:46,y:40,mu:1900,rc:12,col:'#77685a'}] },
+
+{ id:12, fuel:1.4, tmax:40,
+  start:{x:-78,y:52}, goal:{x:0,y:0,orb:{cx:0,cy:0,rx:72,ry:72,T:16,p:2.2}},
+  bodies:[{t:'s',mu:1900,rc:11,col:'#8a7452',orb:{cx:0,cy:0,rx:20,ry:20,T:12,p:0}},
+          {t:'s',mu:1900,rc:11,col:'#6a7280',orb:{cx:0,cy:0,rx:20,ry:20,T:12,p:Math.PI}}] }
+];
+
+// Trümmerfeld von Level 9 (neun Brocken auf einem Ring, ohne Eigenschwerkraft)
+(function(){
+  var L = LEVELS[8];
+  for (var i = 0; i < 9; i++) {
+    L.bodies.push({t:'r', mu:0, rc:3.4, col:'#5a5f63',
+      orb:{cx:0, cy:0, rx:50, ry:50, T:18, p:TAU*i/9}});
+  }
+})();
+
+function prepLevels(){
+  for (var i = 0; i < LEVELS.length; i++) {
+    var lv = LEVELS[i];
+    lv.idx = i;
+    for (var k = 0; k < lv.bodies.length; k++) {
+      var b = lv.bodies[k];
+      if (b.soft === undefined) b.soft = b.rc * 0.85;
+      b.s2 = b.soft * b.soft;
+      if (b.orb) { b.orb.w = TAU / b.orb.T; b.moving = true; } else { b.moving = false; }
+    }
+    if (lv.goal.orb) { lv.goal.orb.w = TAU / lv.goal.orb.T; lv.goal.moving = true; }
+    var s = SOLS[lv.id] || {};
+    lv.cps = s.cps || [];
+    lv.sol = s.sol || null;
+  }
+}
+
+var _P = {x:0, y:0};
+var _ax = 0, _ay = 0;
+
+function bpos(b, t, o){
+  if (b.orb) {
+    var a = b.orb.w * t + b.orb.p;
+    o.x = b.orb.cx + b.orb.rx * Math.cos(a);
+    o.y = b.orb.cy + b.orb.ry * Math.sin(a);
+  } else { o.x = b.x; o.y = b.y; }
+  return o;
+}
+function goalPos(lv, t, o){ return bpos(lv.goal, t, o); }
+
+function accel(w, t, inp){
+  var lv = w.lv, ax = 0, ay = 0, i, b, dx, dy, r2, inv;
+  for (i = 0; i < lv.bodies.length; i++) {
+    b = lv.bodies[i];
+    if (b.mu === 0) continue;
+    bpos(b, t, _P);
+    dx = _P.x - w.x; dy = _P.y - w.y;
+    r2 = dx * dx + dy * dy + b.s2;
+    inv = b.mu / (r2 * Math.sqrt(r2));
+    ax += dx * inv; ay += dy * inv;
+  }
+  if (inp && inp.thrust && w.fuel > 0) {
+    dx = inp.tx - w.x; dy = inp.ty - w.y;
+    var d = Math.sqrt(dx * dx + dy * dy);
+    if (d > 1e-9) { ax += THRUST_A * dx / d; ay += THRUST_A * dy / d; }
+  }
+  _ax = ax; _ay = ay;
+}
+
+var _f64 = new Float64Array(1), _u32 = new Uint32Array(_f64.buffer);
+function hstep(h, v){
+  _f64[0] = v;
+  h = (h ^ _u32[0]) >>> 0; h = Math.imul(h, 16777619) >>> 0;
+  h = (h ^ _u32[1]) >>> 0; h = Math.imul(h, 16777619) >>> 0;
+  return h;
+}
+
+function worldFor(lv, li){
+  var w = { li:li, lv:lv, tick:0, lt:0, x:lv.start.x, y:lv.start.y,
+    vx:0, vy:0, ax:0, ay:0, fuel:lv.fuel || 0, st:'aim', why:'',
+    cps:[], nc:0, newcp:-1, h:2166136261, thrusting:false };
+  for (var i = 0; i < lv.cps.length; i++) w.cps.push(false);
+  return w;
+}
+function makeWorld(li){ return worldFor(LEVELS[li], li); }
+
+// Testhilfe: Kreisbahn um einen festen Körper, Energiedrift über n Umläufe.
+function energyDrift(n){
+  var mu = 2400, soft = 1e-6, r = 25;
+  var lv = { id:0, idx:-1, fuel:0, tmax:1e9, cps:[], start:{x:r,y:0},
+    goal:{x:1e9,y:1e9},
+    bodies:[{t:'p', x:0, y:0, mu:mu, rc:1e-6, soft:soft, s2:soft*soft, col:'#000', moving:false}] };
+  var w = worldFor(lv, -1);
+  var v = r * Math.sqrt(mu / Math.pow(r * r + soft * soft, 1.5));
+  launch(w, Math.PI / 2, v / VMAX);
+  var E = function(){
+    var rr = Math.sqrt(w.x * w.x + w.y * w.y + soft * soft);
+    return 0.5 * (w.vx * w.vx + w.vy * w.vy) - mu / rr;
+  };
+  var e0 = E(), emin = e0, emax = e0;
+  var T = TAU * r / v;
+  var N = Math.round(n * T / DT);
+  for (var i = 0; i < N; i++) {
+    step(w, null);
+    if (w.st !== 'fly') return {err:'abbruch ' + w.why, i:i};
+    var e = E();
+    if (e < emin) emin = e; if (e > emax) emax = e;
+  }
+  var rEnd = Math.sqrt(w.x * w.x + w.y * w.y);
+  return { e0:e0, emin:emin, emax:emax, drift:Math.abs((emax - emin) / e0),
+           endDrift:Math.abs((E() - e0) / e0), orbits:n, ticks:N,
+           r0:r, rEnd:rEnd, radial:Math.abs(rEnd - r) / r };
+}
+
+function launch(w, ang, pow){
+  if (pow > 1) pow = 1; if (pow < 0) pow = 0;
+  var sp = VMAX * (w.lv.vcap || 1) * pow;
+  w.vx = Math.cos(ang) * sp;
+  w.vy = Math.sin(ang) * sp;
+  w.st = 'fly'; w.lt = w.tick;
+  accel(w, w.tick * DT, null);
+  w.ax = _ax; w.ay = _ay;
+}
+
+function step(w, inp){
+  w.newcp = -1;
+  if (w.st !== 'fly') { w.tick++; return; }
+  var dt = DT, lv = w.lv, i, b, dx, dy;
+  w.x += w.vx * dt + 0.5 * w.ax * dt * dt;
+  w.y += w.vy * dt + 0.5 * w.ay * dt * dt;
+  w.tick++;
+  var t = w.tick * dt;
+  var thr = !!(inp && inp.thrust && w.fuel > 0);
+  w.thrusting = thr;
+  accel(w, t, inp);
+  w.vx += 0.5 * (w.ax + _ax) * dt;
+  w.vy += 0.5 * (w.ay + _ay) * dt;
+  w.ax = _ax; w.ay = _ay;
+  if (thr) { w.fuel -= dt; if (w.fuel < 0) w.fuel = 0; }
+  w.h = hstep(w.h, w.x); w.h = hstep(w.h, w.y);
+
+  for (i = 0; i < lv.bodies.length; i++) {
+    b = lv.bodies[i];
+    bpos(b, t, _P);
+    dx = _P.x - w.x; dy = _P.y - w.y;
+    if (dx * dx + dy * dy < b.rc * b.rc) { w.st = 'dead'; w.why = 'crash'; return; }
+  }
+  if (w.x * w.x + w.y * w.y > R_OUT * R_OUT) { w.st = 'dead'; w.why = 'out'; return; }
+  if ((w.tick - w.lt) * dt > lv.tmax) { w.st = 'dead'; w.why = 'time'; return; }
+  for (i = 0; i < lv.cps.length; i++) {
+    if (w.cps[i]) continue;
+    dx = lv.cps[i].x - w.x; dy = lv.cps[i].y - w.y;
+    if (dx * dx + dy * dy < CP_R * CP_R) { w.cps[i] = true; w.nc++; w.newcp = i; }
+  }
+  goalPos(lv, t, _P);
+  dx = _P.x - w.x; dy = _P.y - w.y;
+  if (dx * dx + dy * dy < GOAL_R * GOAL_R) { w.st = 'win'; }
+}
+
+function solInput(sol, w){
+  var th = sol.th;
+  if (!th) return null;
+  var rt = (w.tick - w.lt) * DT;
+  for (var i = 0; i < th.length; i++) {
+    if (rt >= th[i].t0 && rt < th[i].t1) return {thrust:true, tx:th[i].x, ty:th[i].y};
+  }
+  return null;
+}
+
+// Spielt eine hinterlegte Referenzlösung ab. mod erlaubt Störungen für den
+// Fairness-Test (dAng in Grad, dPow relativ).
+function runSolution(li, sol, mod){
+  mod = mod || {};
+  var w = makeWorld(li);
+  var ang = (sol.a + (mod.dAng || 0)) * Math.PI / 180;
+  var pow = sol.v * (1 + (mod.dPow || 0));
+  var lt = sol.t0 || 0;
+  while (w.tick < lt) step(w, null);
+  launch(w, ang, pow);
+  var guard = w.tick + Math.ceil((w.lv.tmax + 1) / DT);
+  while (w.st === 'fly' && w.tick < guard) step(w, solInput(sol, w));
+  return { win:w.st === 'win', st:w.st, why:w.why, cps:w.cps.slice(), nc:w.nc,
+           ticks:w.tick, flight:(w.tick - w.lt) * DT, hash:w.h >>> 0,
+           x:w.x, y:w.y, fuel:w.fuel };
+}
+
+// Vorschau: ~2 s Spielzeit, Punkte in gleichen Zeitabständen.
+function preview(w, ang, pow, secs, every){
+  var p = { li:w.li, lv:w.lv, tick:w.tick, lt:w.tick, x:w.lv.start.x, y:w.lv.start.y,
+    vx:0, vy:0, ax:0, ay:0, fuel:w.fuel, st:'aim', why:'', cps:[], nc:0, newcp:-1,
+    h:0, thrusting:false };
+  launch(p, ang, pow);
+  var n = Math.round(secs / DT), out = [];
+  for (var i = 1; i <= n; i++) {
+    step(p, null);
+    if (p.st !== 'fly') break;
+    if (i % every === 0) out.push(p.x, p.y);
+  }
+  return out;
+}
+/*<</CORE>>*/
+
+// ---------------------------------------------------------------------------
+// Darstellung und Steuerung
+// ---------------------------------------------------------------------------
+prepLevels();
+
+var ACC = '#6fd3e8';          // Sonde, Vorschau, Spur
+var GOL = '#e8a33d';          // Ziel und Messpunkte
+var LX = -0.54, LY = -0.84;   // Lichtrichtung
+
+var cv = document.getElementById('cv');
+var ctx = cv.getContext('2d', {alpha:false, desynchronized:false});
+var fc = document.createElement('canvas');      // statische Ebene
+var fctx = fc.getContext('2d', {alpha:false});
+
+var dpr = 1, sc = 1, ox = 0, oy = 0, cssW = 0, cssH = 0;
+var cur = 0, w = null, trail = [], ghost = null;
+var drag = null, hold = null, multi = null;
+var deadAt = 0, winAt = 0, gridOpen = false, diagOn = false;
+var prevPts = null, prevKey = '';
+var muted = false, actx = null;
+var fps = 0, ftm = 16.7, stepsF = 0;
+var PROG = {stars:{}, last:0};
+
+function shade(hex, f){
+  var n = parseInt(hex.slice(1), 16);
+  var r = Math.round(Math.min(255, ((n >> 16) & 255) * f));
+  var g = Math.round(Math.min(255, ((n >> 8) & 255) * f));
+  var b = Math.round(Math.min(255, (n & 255) * f));
+  return 'rgb(' + r + ',' + g + ',' + b + ')';
+}
+for (var _i = 0; _i < LEVELS.length; _i++) {
+  var _bs = LEVELS[_i].bodies;
+  for (var _k = 0; _k < _bs.length; _k++) {
+    _bs[_k].dark = shade(_bs[_k].col, 0.30);
+    _bs[_k].rim = shade(_bs[_k].col, 1.18);
+  }
+}
+
+// Höhenlinien-Leiter des Potentials (geometrisch gestaffelt)
+var CLEV = [];
+(function(){ for (var v = 13; v < 1200; v *= 1.30) CLEV.push(v); })();
+function clevAlpha(i){ return 0.12 + 0.30 * (i / (CLEV.length - 1)); }
+
+function mulberry32(a){
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    var t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function X(x){ return ox + x * sc; }
+function Y(y){ return oy + y * sc; }
+function lw(v){ var n = Math.round(v * dpr); return n < 1 ? 1 : n; }
+function toWorld(clx, cly){
+  return { x:(clx * dpr - ox) / sc, y:(cly * dpr - oy) / sc };
+}
+
+// --- Layout: Canvas exakt in Gerätepixeln, keine interne Skalierung ---------
+function layout(){
+  var r = cv.getBoundingClientRect();
+  cssW = r.width; cssH = r.height;
+  dpr = window.devicePixelRatio || 1;
+  var W = Math.round(cssW * dpr), H = Math.round(cssH * dpr);
+  if (W < 1) W = 1; if (H < 1) H = 1;
+  if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+  sc = Math.min(W, H) / (2 * FIT_R);
+  ox = W / 2; oy = H / 2;
+  buildField();
+}
+
+// --- Statische Ebene: Sterne, Äquipotentiallinien, feste Körper -------------
+var bfN = 0;   // Zähler: wie oft wurde die statische Ebene neu berechnet
+function buildField(){
+  bfN++;
+  var W = cv.width, H = cv.height;
+  if (fc.width !== W || fc.height !== H) { fc.width = W; fc.height = H; }
+  var g = fctx;
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.fillStyle = '#000000';
+  g.fillRect(0, 0, W, H);
+
+  var rnd = mulberry32(0x5eed3);
+  var n = Math.round(W * H / 5200);
+  var us = Math.round(dpr / 2); if (us < 1) us = 1;
+  for (var i = 0; i < n; i++) {
+    var x = Math.floor(rnd() * W), y = Math.floor(rnd() * H);
+    var big = rnd() > 0.965 ? 2 : 1;
+    var a = 0.14 + 0.66 * Math.pow(rnd(), 1.9);
+    g.fillStyle = 'rgba(186,198,206,' + a.toFixed(3) + ')';
+    g.fillRect(x, y, big * us, big * us);
+  }
+
+  var lv = LEVELS[cur], st = [], k;
+  for (k = 0; k < lv.bodies.length; k++) if (!lv.bodies[k].moving && lv.bodies[k].mu > 0) st.push(lv.bodies[k]);
+
+  if (st.length) {
+    var SP = Math.round(3 * dpr); if (SP < 4) SP = 4;
+    var nx = Math.ceil(W / SP) + 1, ny = Math.ceil(H / SP) + 1;
+    var F = new Float32Array(nx * ny);
+    var fmin = Infinity, fmax = -Infinity, sumMu = 0;
+    for (k = 0; k < st.length; k++) sumMu += st[k].mu;
+    for (var j = 0; j < ny; j++) {
+      var wy = (j * SP - oy) / sc;
+      for (var i2 = 0; i2 < nx; i2++) {
+        var wx = (i2 * SP - ox) / sc, f = 0;
+        for (k = 0; k < st.length; k++) {
+          var b = st[k], dx = wx - b.x, dy = wy - b.y;
+          f += b.mu / Math.sqrt(dx * dx + dy * dy + b.s2);
+        }
+        F[j * nx + i2] = f;
+        if (f < fmin) fmin = f;
+        if (f > fmax) fmax = f;
+      }
+    }
+    g.lineWidth = 1;
+    g.lineCap = 'butt';
+    for (var L = 0; L < CLEV.length; L++) {
+      var lev = CLEV[L];
+      if (lev <= fmin || lev >= fmax) continue;   // Linie liegt nicht im Bild
+      // Die Linie F=lev liegt höchstens sumMu/lev von einem Körper entfernt;
+      // nur dieses Fenster wird abgesucht.
+      var rpx = (sumMu / lev) * sc;
+      var i0 = nx, i1 = 0, j0 = ny, j1 = 0;
+      for (k = 0; k < st.length; k++) {
+        var bx = X(st[k].x), by = Y(st[k].y);
+        i0 = Math.min(i0, Math.floor((bx - rpx) / SP));
+        i1 = Math.max(i1, Math.ceil((bx + rpx) / SP));
+        j0 = Math.min(j0, Math.floor((by - rpx) / SP));
+        j1 = Math.max(j1, Math.ceil((by + rpx) / SP));
+      }
+      if (i0 < 0) i0 = 0; if (j0 < 0) j0 = 0;
+      if (i1 > nx - 1) i1 = nx - 1; if (j1 > ny - 1) j1 = ny - 1;
+      if (i1 <= i0 || j1 <= j0) continue;
+      g.strokeStyle = 'rgba(146,174,190,' + clevAlpha(L).toFixed(3) + ')';
+      marching(g, F, nx, ny, SP, lev, i0, i1, j0, j1);
+    }
+  }
+  for (k = 0; k < lv.bodies.length; k++) {
+    var bb = lv.bodies[k];
+    if (!bb.moving) drawBody(g, bb, X(bb.x), Y(bb.y));
+  }
+}
+
+function marching(g, F, nx, ny, SP, L, i0, i1, j0, j1){
+  g.beginPath();
+  var drew = false;
+  for (var j = j0; j < j1; j++) {
+    var row = j * nx, row2 = row + nx;
+    for (var i = i0; i < i1; i++) {
+      var a = F[row + i], b = F[row + i + 1], c = F[row2 + i + 1], d = F[row2 + i];
+      var idx = (a > L ? 8 : 0) | (b > L ? 4 : 0) | (c > L ? 2 : 0) | (d > L ? 1 : 0);
+      if (idx === 0 || idx === 15) continue;
+      var x0 = i * SP, y0 = j * SP, x1 = x0 + SP, y1 = y0 + SP;
+      var tx = x0 + SP * (L - a) / (b - a);
+      var ry = y0 + SP * (L - b) / (c - b);
+      var bx = x0 + SP * (L - d) / (c - d);
+      var ly = y0 + SP * (L - a) / (d - a);
+      drew = true;
+      switch (idx) {
+        case 1: case 14: g.moveTo(x0, ly); g.lineTo(bx, y1); break;
+        case 2: case 13: g.moveTo(bx, y1); g.lineTo(x1, ry); break;
+        case 3: case 12: g.moveTo(x0, ly); g.lineTo(x1, ry); break;
+        case 4: case 11: g.moveTo(tx, y0); g.lineTo(x1, ry); break;
+        case 6: case 9:  g.moveTo(tx, y0); g.lineTo(bx, y1); break;
+        case 7: case 8:  g.moveTo(tx, y0); g.lineTo(x0, ly); break;
+        case 5: g.moveTo(tx, y0); g.lineTo(x0, ly); g.moveTo(bx, y1); g.lineTo(x1, ry); break;
+        case 10: g.moveTo(tx, y0); g.lineTo(x1, ry); g.moveTo(x0, ly); g.lineTo(bx, y1); break;
+      }
+    }
+  }
+  if (drew) g.stroke();
+}
+
+// Mitlaufende Ringe für bewegte Körper (gleiche Potentialleiter).
+function movingRings(g, b, px, py){
+  g.lineWidth = 1;
+  for (var L = 0; L < CLEV.length; L++) {
+    var q = b.mu / CLEV[L];
+    if (q <= b.soft) continue;
+    var r = Math.sqrt(q * q - b.s2) * sc;
+    if (r < b.rc * sc * 1.04 || r > Math.max(cv.width, cv.height)) continue;
+    g.strokeStyle = 'rgba(146,174,190,' + clevAlpha(L).toFixed(3) + ')';
+    g.beginPath(); g.arc(px, py, r, 0, TAU); g.stroke();
+  }
+}
+
+function drawBody(g, b, px, py){
+  var R = b.rc * sc;
+  if (b.t === 'h') {
+    g.fillStyle = '#000000';
+    g.beginPath(); g.arc(px, py, R, 0, TAU); g.fill();
+    g.strokeStyle = 'rgba(214,224,230,0.92)';
+    g.lineWidth = lw(0.85);
+    g.beginPath(); g.arc(px, py, R * 1.5, 0, TAU); g.stroke();
+    return;
+  }
+  if (b.t === 'r') {
+    g.fillStyle = b.dark;
+    g.beginPath(); g.arc(px, py, R, 0, TAU); g.fill();
+    g.strokeStyle = b.col; g.lineWidth = lw(0.8);
+    g.beginPath(); g.arc(px, py, R - lw(0.8) / 2, 0, TAU); g.stroke();
+    return;
+  }
+  g.fillStyle = b.dark;
+  g.beginPath(); g.arc(px, py, R, 0, TAU); g.fill();
+  g.save();
+  g.beginPath(); g.arc(px, py, R, 0, TAU); g.clip();
+  var d = 1.3 * R, R2 = Math.sqrt(R * R + d * d);
+  g.fillStyle = b.col;
+  g.beginPath(); g.arc(px + LX * d, py + LY * d, R2, 0, TAU); g.fill();
+  g.restore();
+  g.strokeStyle = b.rim;
+  g.lineWidth = lw(0.8);
+  g.beginPath(); g.arc(px, py, R - lw(0.8) / 2, 0, TAU); g.stroke();
+}
+
+// --- Zeichnen ---------------------------------------------------------------
+function dot(g, x, y, r){ g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); }
+function diamond(g, x, y, r){
+  g.beginPath(); g.moveTo(x, y - r); g.lineTo(x + r, y); g.lineTo(x, y + r); g.lineTo(x - r, y); g.closePath();
+}
+function poly(g, a){
+  if (a.length < 4) return;
+  g.beginPath(); g.moveTo(X(a[0]), Y(a[1]));
+  for (var i = 2; i < a.length; i += 2) g.lineTo(X(a[i]), Y(a[i + 1]));
+  g.stroke();
+}
+
+function render(){
+  var g = ctx, lv = LEVELS[cur], i, b, t = w.tick * DT;
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.drawImage(fc, 0, 0);
+
+  // Spielfeldrand
+  g.strokeStyle = 'rgba(120,140,152,0.13)';
+  g.lineWidth = 1;
+  g.beginPath(); g.arc(ox, oy, R_OUT * sc, 0, TAU); g.stroke();
+
+  // bewegte Körper mit mitlaufenden Höhenlinien
+  for (i = 0; i < lv.bodies.length; i++) {
+    b = lv.bodies[i];
+    if (!b.moving) continue;
+    bpos(b, t, _P);
+    var px = X(_P.x), py = Y(_P.y);
+    if (b.mu > 0) movingRings(g, b, px, py);
+    drawBody(g, b, px, py);
+  }
+
+  // Spuren
+  if (ghost && ghost.length > 3) {
+    g.strokeStyle = 'rgba(111,211,232,0.13)'; g.lineWidth = lw(1); poly(g, ghost);
+  }
+  if (trail.length > 3) {
+    g.strokeStyle = 'rgba(111,211,232,0.42)'; g.lineWidth = lw(1); poly(g, trail);
+  }
+
+  // Messpunkte
+  for (i = 0; i < lv.cps.length; i++) {
+    var c = lv.cps[i], cxp = X(c.x), cyp = Y(c.y), cr = CP_R * sc;
+    if (w.cps[i]) {
+      g.fillStyle = 'rgba(232,163,61,0.85)'; diamond(g, cxp, cyp, cr * 0.42); g.fill();
+      g.strokeStyle = 'rgba(232,163,61,0.22)';
+    } else {
+      g.strokeStyle = 'rgba(232,163,61,0.78)';
+    }
+    g.lineWidth = lw(1.1); diamond(g, cxp, cyp, cr); g.stroke();
+  }
+
+  // Ziel
+  goalPos(lv, t, _P);
+  var gx = X(_P.x), gy = Y(_P.y), gr = GOAL_R * sc;
+  g.strokeStyle = GOL; g.lineWidth = lw(1.6);
+  g.beginPath(); g.arc(gx, gy, gr - lw(1.6) / 2, 0, TAU); g.stroke();
+  g.strokeStyle = 'rgba(232,163,61,0.42)'; g.lineWidth = lw(1);
+  g.beginPath(); g.arc(gx, gy, gr * 0.44, 0, TAU); g.stroke();
+
+  // Zielvorschau beim Spannen
+  if (drag && w.st === 'aim') {
+    var ai = aimFrom(drag);
+    if (ai.pow >= MIN_POW) {
+      if (prevKey !== ai.key) { prevPts = preview(w, ai.ang, ai.pow, 2.0, 24); prevKey = ai.key; }
+      g.fillStyle = ACC;
+      var pr = Math.max(1.4, 1.7 * dpr);
+      for (i = 0; i < prevPts.length; i += 2) {
+        g.globalAlpha = 0.80 - 0.55 * (i / Math.max(2, prevPts.length));
+        dot(g, X(prevPts[i]), Y(prevPts[i + 1]), pr);
+      }
+      g.globalAlpha = 1;
+      var sx = X(w.x), sy = Y(w.y), L = 26 * sc * ai.pow;
+      g.strokeStyle = 'rgba(111,211,232,0.55)'; g.lineWidth = lw(1);
+      g.beginPath(); g.moveTo(sx, sy);
+      g.lineTo(sx + Math.cos(ai.ang) * L, sy + Math.sin(ai.ang) * L); g.stroke();
+    } else { prevPts = null; prevKey = ''; }
+  }
+
+  // Sonde
+  if (w.st !== 'win' || (performance.now() - winAt) < 1e9) {
+    var wx = X(w.x), wy = Y(w.y);
+    if (w.thrusting && w.st === 'fly') {
+      g.strokeStyle = 'rgba(111,211,232,0.5)'; g.lineWidth = lw(1);
+      var hw = toWorld(hold ? hold.x : 0, hold ? hold.y : 0);
+      var dx = hw.x - w.x, dy = hw.y - w.y, dl = Math.hypot(dx, dy) || 1;
+      g.beginPath(); g.moveTo(wx, wy);
+      g.lineTo(wx - dx / dl * 13 * sc, wy - dy / dl * 13 * sc); g.stroke();
+    }
+    g.fillStyle = w.st === 'dead' ? 'rgba(111,211,232,0.35)' : ACC;
+    dot(g, wx, wy, Math.max(2, 2.7 * dpr));
+  }
+}
+
+function aimFrom(d){
+  var dx = d.x - d.x0, dy = d.y - d.y0;
+  var len = Math.sqrt(dx * dx + dy * dy);
+  var pow = Math.min(1, len / (Math.min(cssW, cssH) * 0.30));
+  var ang = Math.atan2(-dy, -dx);
+  return { pow:pow, ang:ang, key:Math.round(ang * 2000) + '|' + Math.round(pow * 2000) + '|' + w.tick };
+}
+
+// --- Ablauf -----------------------------------------------------------------
+var MAXSTEPS = 32;
+function tickGame(){
+  var inp = null;
+  if (w.st === 'fly' && hold && (w.lv.fuel || 0) > 0 && w.fuel > 0) {
+    var p = toWorld(hold.x, hold.y);
+    inp = {thrust:true, tx:p.x, ty:p.y};
+  }
+  var pre = w.st;
+  step(w, inp);
+  if (w.st === 'fly' && (w.tick & 3) === 0) { trail.push(w.x, w.y); }
+  if (w.newcp >= 0) snd('cp');
+  if (pre === 'fly' && w.st === 'dead') { snd('bad'); deadAt = performance.now(); ghost = trail.slice(); }
+  if (pre === 'fly' && w.st === 'win') { snd('win'); onWin(); }
+  if (w.st === 'dead' && performance.now() - deadAt > 500) resetAttempt();
+}
+
+var lastT = 0, accT = 0, fpsN = 0, fpsT = 0;
+function frame(now){
+  requestAnimationFrame(frame);
+  if (!lastT) lastT = now;
+  var d = (now - lastT) / 1000; lastT = now;
+  if (d > 0.25) d = 0.25;
+  ftm = ftm * 0.88 + (d * 1000) * 0.12;
+  fpsN++;
+  if (now - fpsT > 500) { fps = fpsN * 1000 / (now - fpsT); fpsN = 0; fpsT = now; }
+  accT += d;
+  var n = 0;
+  while (accT >= DT && n < MAXSTEPS) { tickGame(); accT -= DT; n++; }
+  if (accT > DT * MAXSTEPS) accT = 0;
+  stepsF = n;
+  render();
+  if (diagOn) {
+    diagEl.textContent = fps.toFixed(0) + ' fps\n' + ftm.toFixed(1) + ' ms\n' + stepsF + ' Schritte';
+  }
+  var fw = document.getElementById('fuelwrap');
+  if ((w.lv.fuel || 0) > 0 && w.st !== 'win') {
+    fw.classList.add('on');
+    fuelEl.style.transform = 'scaleX(' + (w.fuel / w.lv.fuel).toFixed(4) + ')';
+  } else fw.classList.remove('on');
+}
+
+function resetAttempt(){
+  w = makeWorld(cur);
+  trail = []; drag = null; hold = null; prevPts = null; prevKey = '';
+}
+function loadLevel(i){
+  cur = ((i % LEVELS.length) + LEVELS.length) % LEVELS.length;
+  PROG.last = cur; saveProg();
+  ghost = null;
+  resetAttempt();
+  badgeEl.textContent = String(cur + 1);
+  winEl.className = '';
+  buildField();
+}
+function onWin(){
+  winAt = performance.now();
+  var st = w.nc;
+  var k = String(LEVELS[cur].id);
+  if (!(PROG.stars[k] >= st)) { PROG.stars[k] = st; saveProg(); }
+  starsEl.innerHTML = '';
+  for (var i = 0; i < 3; i++) starsEl.appendChild(starSvg(i < st, 26));
+  winEl.className = 'on';
+  setTimeout(function(){ if (winEl.className === 'on') winEl.className = 'on show'; }, 16);
+}
+function nextLevel(){
+  winEl.className = '';
+  loadLevel(cur + 1);
+}
+
+function starSvg(on, size){
+  var ns = 'http://www.w3.org/2000/svg';
+  var s = document.createElementNS(ns, 'svg');
+  s.setAttribute('viewBox', '0 0 24 24');
+  s.setAttribute('width', size); s.setAttribute('height', size);
+  var p = document.createElementNS(ns, 'path');
+  p.setAttribute('d', 'M12 2.8l2.83 5.9 6.42.88-4.66 4.5 1.14 6.42L12 17.44 6.27 20.5l1.14-6.42-4.66-4.5 6.42-.88z');
+  p.setAttribute('class', on ? 'st-on' : 'st-off');
+  p.setAttribute('stroke-linejoin', 'round');
+  s.appendChild(p);
+  return s;
+}
+
+// --- Eingabe ----------------------------------------------------------------
+var badgeEl = document.getElementById('badge');
+var fuelEl = document.getElementById('fuel');
+var winEl = document.getElementById('win');
+var starsEl = document.getElementById('stars');
+var gridEl = document.getElementById('grid');
+var gwrapEl = document.getElementById('gwrap');
+var diagEl = document.getElementById('diag');
+
+var ptrs = new Map();
+function onDown(e){
+  e.preventDefault();
+  initAudio();
+  ptrs.set(e.pointerId, {x:e.clientX, y:e.clientY, x0:e.clientX, y0:e.clientY});
+  if (ptrs.size === 2) {
+    drag = null; hold = null; prevPts = null;
+    multi = {t:performance.now(), move:0};
+    return;
+  }
+  if (ptrs.size > 2) { multi = null; return; }
+  if (w.st === 'win') {
+    if (performance.now() - winAt > 380) nextLevel();
+    return;
+  }
+  if (w.st === 'aim') drag = {id:e.pointerId, x0:e.clientX, y0:e.clientY, x:e.clientX, y:e.clientY};
+  else if (w.st === 'fly' && (w.lv.fuel || 0) > 0) hold = {id:e.pointerId, x:e.clientX, y:e.clientY};
+}
+function onMove(e){
+  var p = ptrs.get(e.pointerId);
+  if (!p) return;
+  p.x = e.clientX; p.y = e.clientY;
+  if (multi) multi.move = Math.max(multi.move, Math.hypot(p.x - p.x0, p.y - p.y0));
+  if (drag && drag.id === e.pointerId) { drag.x = e.clientX; drag.y = e.clientY; }
+  if (hold && hold.id === e.pointerId) { hold.x = e.clientX; hold.y = e.clientY; }
+}
+function onUp(e){
+  ptrs.delete(e.pointerId);
+  if (drag && drag.id === e.pointerId) {
+    var ai = aimFrom(drag);
+    drag = null; prevPts = null; prevKey = '';
+    if (ai.pow >= MIN_POW && w.st === 'aim') { launch(w, ai.ang, ai.pow); snd('go'); }
+  }
+  if (hold && hold.id === e.pointerId) hold = null;
+  if (ptrs.size === 0 && multi) {
+    if (performance.now() - multi.t < 450 && multi.move < 16) restart();
+    multi = null;
+  }
+}
+function restart(){
+  // Ein abgebrochener Flug bleibt als blasse Linie stehen, ein Neustart aus
+  // dem Zielbildschirm heraus räumt auf.
+  if (w.st === 'fly' && trail.length > 3) ghost = trail.slice();
+  else if (w.st === 'win' || w.st === 'aim') ghost = null;
+  winEl.className = '';
+  resetAttempt();
+}
+
+cv.addEventListener('pointerdown', onDown, {passive:false});
+window.addEventListener('pointermove', onMove, {passive:false});
+window.addEventListener('pointerup', onUp, {passive:false});
+window.addEventListener('pointercancel', onUp, {passive:false});
+document.addEventListener('gesturestart', function(e){ e.preventDefault(); });
+document.addEventListener('dblclick', function(e){ e.preventDefault(); });
+document.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+
+// --- Knöpfe, Levelraster, Diagnose -----------------------------------------
+document.getElementById('bRes').addEventListener('click', function(){ initAudio(); restart(); });
+document.getElementById('bGrid').addEventListener('click', function(){ initAudio(); openGrid(); });
+document.getElementById('bSnd').addEventListener('click', function(){
+  initAudio(); muted = !muted;
+  document.getElementById('sndOn').style.display = muted ? 'none' : '';
+  document.getElementById('sndOff').style.display = muted ? '' : 'none';
+  try { localStorage.setItem('swingby.mute', muted ? '1' : '0'); } catch (err) {}
+});
+
+function openGrid(){
+  gwrapEl.innerHTML = '';
+  for (var i = 0; i < LEVELS.length; i++) {
+    (function(i){
+      var d = document.createElement('div');
+      d.className = 'cell';
+      var b = document.createElement('b'); b.textContent = String(i + 1);
+      var s = document.createElement('i');
+      var got = PROG.stars[String(LEVELS[i].id)] || 0;
+      for (var k = 0; k < 3; k++) s.appendChild(starSvg(k < got, 9));
+      d.appendChild(b); d.appendChild(s);
+      d.addEventListener('click', function(ev){ ev.stopPropagation(); closeGrid(); loadLevel(i); });
+      gwrapEl.appendChild(d);
+    })(i);
+  }
+  gridEl.className = 'on'; gridOpen = true;
+}
+function closeGrid(){ gridEl.className = ''; gridOpen = false; }
+gridEl.addEventListener('click', closeGrid);
+
+var lpT = 0;
+badgeEl.addEventListener('pointerdown', function(e){
+  e.preventDefault();
+  lpT = setTimeout(function(){
+    diagOn = !diagOn;
+    diagEl.className = diagOn ? 'on' : '';
+  }, 600);
+});
+function lpEnd(){ clearTimeout(lpT); }
+badgeEl.addEventListener('pointerup', lpEnd);
+badgeEl.addEventListener('pointerleave', lpEnd);
+badgeEl.addEventListener('pointercancel', lpEnd);
+
+// --- Ton --------------------------------------------------------------------
+function initAudio(){
+  if (actx) { if (actx.state === 'suspended') actx.resume(); return; }
+  try {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) actx = new AC();
+  } catch (e) { actx = null; }
+}
+function snd(kind){
+  if (!actx || muted || actx.state !== 'running') return;
+  var t = actx.currentTime, f0, f1, d, ty = 'sine', v = 0.06;
+  if (kind === 'go') { f0 = 210; f1 = 130; d = 0.13; ty = 'triangle'; v = 0.055; }
+  else if (kind === 'cp') { f0 = 880; f1 = 1320; d = 0.09; v = 0.045; }
+  else if (kind === 'win') { f0 = 523; f1 = 784; d = 0.30; v = 0.06; }
+  else if (kind === 'bad') { f0 = 150; f1 = 55; d = 0.20; ty = 'sawtooth'; v = 0.04; }
+  else return;
+  try {
+    var o = actx.createOscillator(), g = actx.createGain();
+    o.type = ty;
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + d);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(v, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+    o.connect(g); g.connect(actx.destination);
+    o.start(t); o.stop(t + d + 0.03);
+  } catch (e) {}
+}
+
+// --- Fortschritt ------------------------------------------------------------
+function loadProg(){
+  try {
+    var s = localStorage.getItem('swingby.v1');
+    if (s) { var p = JSON.parse(s); if (p && typeof p === 'object') PROG = p; }
+    muted = localStorage.getItem('swingby.mute') === '1';
+  } catch (e) {}
+  if (!PROG.stars || typeof PROG.stars !== 'object') PROG.stars = {};
+  if (typeof PROG.last !== 'number' || PROG.last < 0 || PROG.last >= LEVELS.length) PROG.last = 0;
+}
+function saveProg(){
+  try { localStorage.setItem('swingby.v1', JSON.stringify(PROG)); } catch (e) {}
+}
+
+// --- Start ------------------------------------------------------------------
+loadProg();
+document.getElementById('sndOn').style.display = muted ? 'none' : '';
+document.getElementById('sndOff').style.display = muted ? '' : 'none';
+w = makeWorld(0);
+layout();
+loadLevel(PROG.last || 0);
+
+var relay = 0;
+function onResize(){
+  clearTimeout(relay);
+  relay = setTimeout(layout, 40);
+  layout();
+}
+window.addEventListener('resize', onResize);
+window.addEventListener('orientationchange', onResize);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', onResize);
+
+requestAnimationFrame(frame);
+
+// --- Testschnittstelle ------------------------------------------------------
+window.SB = {
+  LEVELS:LEVELS, DT:DT, VMAX:VMAX, GOAL_R:GOAL_R, CP_R:CP_R, R_OUT:R_OUT, MIN_POW:MIN_POW,
+  makeWorld:makeWorld, step:step, launch:launch, preview:preview,
+  runSolution:runSolution, energyDrift:energyDrift, prepLevels:prepLevels,
+  go:function(i){ loadLevel(i); },
+  level:function(){ return cur; },
+  state:function(){
+    var r = cv.getBoundingClientRect();
+    return { level:cur, st:w.st, why:w.why, tick:w.tick, x:w.x, y:w.y, vx:w.vx, vy:w.vy,
+      nc:w.nc, cps:w.cps.slice(), fuel:w.fuel, fps:fps, ft:ftm, steps:stepsF,
+      cw:cv.width, ch:cv.height, cssW:r.width, cssH:r.height, dpr:window.devicePixelRatio || 1,
+      sc:sc, ox:ox, oy:oy, gridOpen:gridOpen, diagOn:diagOn, trail:trail.length,
+      ghost:ghost ? ghost.length : 0, muted:muted, bfN:bfN,
+      stars:PROG.stars[String(LEVELS[cur].id)] || 0 };
+  },
+  // Spielt die Referenzlösung über die echte Spielschleife (inkl. Rendern).
+  play:function(i){
+    loadLevel(i);
+    var sol = LEVELS[i].sol;
+    if (!sol) return null;
+    var guard = 0;
+    while (w.tick < (sol.t0 || 0) && guard++ < 1e6) step(w, null);
+    launch(w, sol.a * Math.PI / 180, sol.v);
+    while (w.st === 'fly' && guard++ < 1e6) {
+      var rt = (w.tick - w.lt) * DT, inp = null;
+      if (sol.th) for (var k = 0; k < sol.th.length; k++)
+        if (rt >= sol.th[k].t0 && rt < sol.th[k].t1) { inp = {thrust:true, tx:sol.th[k].x, ty:sol.th[k].y}; break; }
+      step(w, inp);
+      if (w.st === 'fly' && (w.tick & 3) === 0) trail.push(w.x, w.y);
+    }
+    if (w.st === 'win') onWin();
+    return { st:w.st, nc:w.nc, cps:w.cps.slice(), ticks:w.tick };
+  },
+  // Reine Renderzeit ohne rAF-Drosselung (für die Leistungsmessung).
+  bench:function(n){
+    render();
+    var t0 = performance.now();
+    for (var i = 0; i < n; i++) render();
+    var t1 = performance.now();
+    var t2 = performance.now();
+    for (var j = 0; j < n * 4; j++) tickGame();
+    var t3 = performance.now();
+    return { renderMs:(t1 - t0) / n, stepUs:(t3 - t2) * 1000 / (n * 4), n:n };
+  },
+  rebuild:function(){ var t = performance.now(); buildField(); return performance.now() - t; },
+  fuzz:function(i, n, seed){
+    var s = seed >>> 0 || 12345, bad = [];
+    var rnd = function(){ s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+    for (var k = 0; k < n; k++) {
+      var ww = makeWorld(i);
+      var t0 = Math.floor(rnd() * 600);
+      var g = 0;
+      while (ww.tick < t0 && g++ < 1e6) step(ww, null);
+      launch(ww, rnd() * TAU, MIN_POW + rnd() * (1 - MIN_POW));
+      var lim = ww.tick + Math.ceil((LEVELS[i].tmax + 2) / DT), fin = false;
+      var thr = rnd() < 0.5, tx = (rnd() - 0.5) * 200, ty = (rnd() - 0.5) * 200;
+      while (g++ < 1e7) {
+        step(ww, thr ? {thrust:true, tx:tx, ty:ty} : null);
+        if (ww.st !== 'fly') { fin = true; break; }
+        if (ww.tick > lim) break;
+        if (!isFinite(ww.x) || !isFinite(ww.y) || !isFinite(ww.vx) || !isFinite(ww.vy)) { bad.push({k:k, why:'NaN'}); fin = true; break; }
+      }
+      if (!fin) bad.push({k:k, why:'kein Ende', st:ww.st});
+    }
+    return bad;
+  }
+};
+</script></body></html>
