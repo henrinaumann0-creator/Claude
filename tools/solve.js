@@ -69,7 +69,7 @@ function t0List(lv, n){
 // Pro Level ein gewünschter Bahncharakter: Gesamtablenkung, Vorbeiflugabstand
 // (in Körperradien) und ob zwei Körper eng passiert werden sollen.
 const TARGET = {
-  1:{turn:0.75, peri:2.6}, 2:{turn:1.70, peri:2.2}, 3:{turn:2.60, peri:1.9},
+  1:{turn:1.00, peri:2.0}, 2:{turn:1.70, peri:2.2}, 3:{turn:2.60, peri:1.9},
   4:{turn:1.60, peri:2.2}, 5:{turn:1.40, peri:2.2}, 6:{turn:1.80, peri:2.2},
   7:{turn:3.40, peri:2.0, both:true}, 8:{turn:2.20, peri:2.4},
   9:{turn:1.00, peri:2.4}, 10:{turn:1.60, peri:2.2},

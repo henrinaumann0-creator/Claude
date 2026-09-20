@@ -27,9 +27,9 @@ body{font:500 13px/1.15 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,syste
   width:118px;height:3px;background:#161c20;border-radius:2px;overflow:hidden;opacity:0;transition:opacity .18s linear}
 #fuelwrap.on{opacity:1}
 #fuel{height:100%;width:100%;background:#6fd3e8;transform-origin:left center}
-#win{position:absolute;left:0;top:0;right:0;bottom:0;display:none;align-items:center;justify-content:center;flex-direction:column;gap:0}
+#win{position:absolute;left:0;top:0;right:0;bottom:0;display:none;align-items:center;justify-content:flex-start;flex-direction:column;gap:0;padding-top:21%}
 #win.on{display:flex}
-#stars{display:flex;gap:10px;opacity:0;transform:scale(.96);transition:opacity .28s ease-out,transform .28s ease-out}
+#stars{display:flex;gap:10px;width:100%;justify-content:center;opacity:0;transform:scale(.96);transition:opacity .28s ease-out,transform .28s ease-out}
 #win.show #stars{opacity:1;transform:scale(1)}
 #stars svg{width:26px;height:26px;display:block}
 .st-off{fill:none;stroke:#3a4247;stroke-width:1.4}
@@ -82,8 +82,8 @@ var TAU = Math.PI * 2;
 /*<<SOL>>*/
 // Referenzlösungen (3 Sterne) und Messpunkte. Vom Selbsttest geprüft.
 var SOLS = {
-  1:{sol:{t0:0,a:20.91,v:0.3398},
-     cps:[{x:-45.385,y:51.014},{x:0.332,y:56.537},{x:45.948,y:49.598}]},
+  1:{sol:{t0:0,a:333.19,v:0.38},
+     cps:[{x:-47.384,y:-15.102},{x:1.022,y:-26.379},{x:49.101,y:-15.722}]},
   2:{sol:{t0:0,a:2.79,v:0.2588},
      cps:[{x:-40.961,y:42.763},{x:14.28,y:21.561},{x:43.12,y:-35.229}]},
   3:{sol:{t0:0,a:347.36,v:0.303},
@@ -122,8 +122,8 @@ var SOLS = {
 // Messpunkte und Referenzlösung stehen in SOLS, erzeugt von tools/solve.js.
 var LEVELS = [
 { id:1, fuel:0, tmax:30,
-  start:{x:-80,y:40}, goal:{x:80,y:40},
-  bodies:[{t:'p',x:0,y:0,mu:3000,rc:14,col:'#7a6a55'}] },
+  start:{x:-80,y:0}, goal:{x:80,y:0},
+  bodies:[{t:'p',x:0,y:0,mu:2600,rc:15,col:'#7a6a55'}] },
 
 { id:2, fuel:0, tmax:32,
   start:{x:-80,y:44}, goal:{x:42,y:-76},
