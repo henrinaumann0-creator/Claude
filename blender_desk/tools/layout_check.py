@@ -252,7 +252,7 @@ def estimate_triangles(ns):
             n = len(part["section"]) * 2 + (len(part["section"]) - 2) * 2
         elif k == "curve":
             ring = 4 * (part.get("res_ring", 3) + 1)
-            spans = (len(part["points"]) - 1) * part.get("res_u", 8)
+            spans = len(part["points"]) - 1
             n = spans * ring * 2 + ring * 2
         total += n
         rows.append((part["name"], n))

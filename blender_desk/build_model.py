@@ -66,18 +66,23 @@ DRAWER_BOX_DROP   = 0.004   # Kasten sitzt so weit unter der Frontoberkante
 HANDLE_WIDTH      = 0.160   # Achsmass der Griffbuegel
 HANDLE_STANDOFF   = 0.028   # Abstand Griffstange zur Front
 HANDLE_RADIUS     = 0.0060  # Stangenradius
-HANDLE_RES_U      = 8       # Aufloesung entlang der Kurve
+HANDLE_CORNER_R   = 0.013   # Radius am Uebergang Pfosten -> Stange
+HANDLE_CORNER_SEG = 5       # Segmente je Eckbogen
 HANDLE_RES_RING   = 3       # Bevel-Aufloesung (Ring = 4*(n+1) Segmente)
 
 # --- Materialien (sRGB-Hex, wird linear konvertiert) -----------------------
-MAT_WOOD          = ("Holz_Nussbaum", "#6B4526", 0.42, 0.0)   # Name, Farbe, Rauheit, Metallic
+MAT_WOOD          = ("Holz_Nussbaum", "#5C3E28", 0.55, 0.0)   # Name, Farbe, Rauheit, Metallic
 MAT_WOOD_INNER    = ("Holz_Innen",    "#B79A72", 0.62, 0.0)
 MAT_BRASS         = ("Messing",       "#C8A03C", 0.24, 1.0)
 
 # --- Rendering -------------------------------------------------------------
-RENDER_RES        = 1100    # Kantenlaenge der Renderbilder (quadratisch)
-RENDER_SAMPLES    = 64
-BACKDROP_GREY     = 0.62    # neutraler Hintergrund
+RENDER_RES        = 1000    # Kantenlaenge der Renderbilder (quadratisch)
+RENDER_SAMPLES    = 48
+BACKDROP_GREY     = 0.72    # neutraler Hintergrund
+WORLD_STRENGTH    = 0.30    # weiches Grundlicht
+LIGHT_KEY         = 140.0   # Watt - Hauptlicht
+LIGHT_FILL        = 70.0    # Watt - Aufhellung
+LIGHT_RIM         = 90.0    # Watt - Kantenlicht
 TRI_BUDGET        = 10000   # Obergrenze fuer den GLB-Export
 
 # ===========================================================================
@@ -94,6 +99,30 @@ def srgb_to_linear(hex_color):
         c = int(h[i:i + 2], 16) / 255.0
         out.append(c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4)
     return (out[0], out[1], out[2], 1.0)
+
+
+def handle_path(cx, cz, face_y, width, standoff, radius, segments, embed=0.004):
+    """Buegelgriff: zwei Pfosten, waagerechte Stange, gerundete Uebergaenge.
+
+    Der Pfad wird exakt berechnet - anders als Auto-Bezier-Anfasser schiesst
+    er dadurch nicht ueber die Eckpunkte hinaus.
+    """
+    import math as _m
+    hx = width / 2.0
+    bar_y = face_y - standoff                      # Stange vor der Front
+    r = min(radius, standoff * 0.7, hx * 0.4)
+    pts = [(cx - hx, face_y + embed, cz)]          # sitzt im Frontbrett
+    for side in (-1, 1):
+        for i in range(segments + 1):
+            a = _m.pi / 2.0 * (i / float(segments))
+            if side < 0:                            # linker Bogen
+                pts.append((cx - hx + r * (1 - _m.cos(a)),
+                            bar_y + r * (1 - _m.sin(a)), cz))
+            else:                                   # rechter Bogen
+                pts.append((cx + hx - r * (1 - _m.sin(a)),
+                            bar_y + r * (1 - _m.cos(a)), cz))
+    pts.append((cx + hx, face_y + embed, cz))
+    return pts
 
 
 def build_layout():
@@ -205,16 +234,12 @@ def build_layout():
                         depth=FRONT_GROOVE_D))
 
         # Griffbuegel als Kurve: zwei Pfosten + gerundete Stange.
-        hy_front = front_cy - DRAWER_FRONT_TH / 2.0
-        hy_bar = hy_front - HANDLE_STANDOFF
-        hx = HANDLE_WIDTH / 2.0
         parts.append(dict(
             kind="curve", name="Griff_%s" % nm, material=MAT_BRASS,
-            radius=HANDLE_RADIUS, res_u=HANDLE_RES_U, res_ring=HANDLE_RES_RING,
-            points=[(cx - hx, hy_front + 0.004, front_cz),
-                    (cx - hx, hy_bar, front_cz),
-                    (cx + hx, hy_bar, front_cz),
-                    (cx + hx, hy_front + 0.004, front_cz)]))
+            radius=HANDLE_RADIUS, res_ring=HANDLE_RES_RING,
+            points=handle_path(cx, front_cz, front_cy - DRAWER_FRONT_TH / 2.0,
+                               HANDLE_WIDTH, HANDLE_STANDOFF,
+                               HANDLE_CORNER_R, HANDLE_CORNER_SEG)))
 
         # Schubkasten hinter der Front.
         bw = front_w - 2 * DRAWER_SIDE_CLEAR
@@ -371,6 +396,23 @@ def apply_modifiers(obj):
     obj.select_set(False)
 
 
+def clean_mesh(obj, weld=1e-5):
+    """Doppelte Vertices verschweissen, offene Loecher schliessen, Normalen neu."""
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    bmesh.ops.remove_doubles(bm, verts=list(bm.verts), dist=weld)
+    open_edges = [e for e in bm.edges if len(e.link_faces) < 2]
+    if open_edges:
+        bmesh.ops.holes_fill(bm, edges=open_edges, sides=0)
+        open_edges = [e for e in bm.edges if len(e.link_faces) < 2]
+        if open_edges:                              # z.B. Roehrenenden
+            bmesh.ops.triangle_fill(bm, edges=open_edges, use_beauty=True)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(obj.data)
+    bm.free()
+    obj.data.update()
+
+
 def apply_transforms(objects):
     bpy.ops.object.select_all(action="DESELECT")
     for obj in objects:
@@ -456,19 +498,17 @@ def make_curve(part, collection):
     """Messinggriff: Bezier-Kurve mit Bevel-Tiefe, danach zu Mesh konvertiert."""
     curve = bpy.data.curves.new(part["name"], "CURVE")
     curve.dimensions = "3D"
-    curve.resolution_u = part.get("res_u", 8)
+    curve.resolution_u = 1
     curve.bevel_depth = part["radius"]
     curve.bevel_resolution = part.get("res_ring", 3)
     curve.fill_mode = "FULL"
     curve.use_fill_caps = True
 
-    spline = curve.splines.new("BEZIER")
     pts = part["points"]
-    spline.bezier_points.add(len(pts) - 1)
-    for bp, co in zip(spline.bezier_points, pts):
-        bp.co = Vector(co)
-        bp.handle_left_type = "AUTO"
-        bp.handle_right_type = "AUTO"
+    spline = curve.splines.new("POLY")          # exakter Pfad, kein Ueberschwingen
+    spline.points.add(len(pts) - 1)
+    for sp, co in zip(spline.points, pts):
+        sp.co = (co[0], co[1], co[2], 1.0)
 
     obj = bpy.data.objects.new(part["name"], curve)
     collection.objects.link(obj)
@@ -490,29 +530,38 @@ def make_curve(part, collection):
 
 
 def cut_groove(obj, part, collection):
-    """Umlaufende Nut in der Schubfront - per Boolean-Differenz."""
+    """Umlaufende Nut in der Schubfront - Boolean mit einem Rahmenkoerper.
+
+    Vier einzelne Balken wuerden sich in den Ecken ueberlappen und der exakte
+    Boolean-Loeser liefert daraus Non-Manifold-Kanten. Deshalb ein einziger,
+    geschlossener Rahmen (Quader mit rechteckigem Loch).
+    """
     groove = part["groove"]
     inset, width, depth = groove["inset"], groove["width"], groove["depth"]
     cx, cy, cz = part["center"]
     sx, sy, sz = part["size"]
     ow, oh = sx - 2 * inset, sz - 2 * inset          # Aussenmass der Nut
-    front_y = cy - sy / 2.0                          # Vorderflaeche der Front
+    iw, ih = ow - 2 * width, oh - 2 * width          # Innenmass
+    y0 = cy - sy / 2.0 - depth                       # vor der Front beginnen
+    y1 = y0 + depth * 2.0
 
     bm = bmesh.new()
-
-    def add_bar(w, h, ox, oz):
-        res = bmesh.ops.create_cube(bm, size=1.0)
-        verts = res["verts"]
-        bmesh.ops.scale(bm, vec=Vector((w, depth * 2.0, h)), verts=verts)
-        bmesh.ops.translate(
-            bm, vec=Vector((cx + ox, front_y + depth, cz + oz)), verts=verts)
-
-    add_bar(ow, width, 0.0, oh / 2.0 - width / 2.0)                # oben
-    add_bar(ow, width, 0.0, -oh / 2.0 + width / 2.0)               # unten
-    add_bar(width, oh - 2 * width, -ow / 2.0 + width / 2.0, 0.0)   # links
-    add_bar(width, oh - 2 * width, ow / 2.0 - width / 2.0, 0.0)    # rechts
-
+    rings = []
+    for y in (y0, y1):
+        outer = [bm.verts.new((cx + sxx * ow / 2.0, y, cz + szz * oh / 2.0))
+                 for sxx, szz in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+        inner = [bm.verts.new((cx + sxx * iw / 2.0, y, cz + szz * ih / 2.0))
+                 for sxx, szz in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+        rings.append((outer, inner))
+    (fo, fi), (bo, bi) = rings
+    for i in range(4):
+        j = (i + 1) % 4
+        bm.faces.new((fo[i], fo[j], fi[j], fi[i]))   # Stirnflaeche vorne
+        bm.faces.new((bo[j], bo[i], bi[i], bi[j]))   # Stirnflaeche hinten
+        bm.faces.new((fo[j], fo[i], bo[i], bo[j]))   # Aussenwand
+        bm.faces.new((fi[i], fi[j], bi[j], bi[i]))   # Innenwand
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+
     cutter_mesh = bpy.data.meshes.new(part["name"] + "_Nut")
     bm.to_mesh(cutter_mesh)
     bm.free()
@@ -549,6 +598,7 @@ def build_desk(scene):
 
     for obj in objects:
         apply_modifiers(obj)
+        clean_mesh(obj)
     for cutter in cutters:                       # Hilfsgeometrie wieder entfernen
         bpy.data.objects.remove(cutter, do_unlink=True)
 
@@ -556,16 +606,28 @@ def build_desk(scene):
     for obj in objects:                          # Ursprung bleibt unten mittig
         obj.location = (0.0, 0.0, 0.0)
     log("%d Bauteile erzeugt" % len(objects))
-    return coll, objects
+    return objects
 
 
-def setup_studio(scene, objects):
+def setup_studio(scene):
     """Neutraler Hintergrund + schlichtes Studiolicht (nur fuer die Renders)."""
     world = bpy.data.worlds.new("Studio")
     world.use_nodes = True
-    bg = world.node_tree.nodes.get("Background")
-    bg.inputs[0].default_value = (0.5, 0.5, 0.52, 1.0)
-    bg.inputs[1].default_value = 0.6
+    tree = world.node_tree
+    tree.nodes.clear()
+    out_node = tree.nodes.new("ShaderNodeOutputWorld")
+    mix = tree.nodes.new("ShaderNodeMixShader")
+    path = tree.nodes.new("ShaderNodeLightPath")
+    seen = tree.nodes.new("ShaderNodeBackground")       # was die Kamera sieht
+    seen.inputs[0].default_value = (BACKDROP_GREY,) * 3 + (1.0,)
+    seen.inputs[1].default_value = 1.0
+    ambient = tree.nodes.new("ShaderNodeBackground")    # was die Szene beleuchtet
+    ambient.inputs[0].default_value = (0.5, 0.5, 0.52, 1.0)
+    ambient.inputs[1].default_value = WORLD_STRENGTH
+    tree.links.new(path.outputs["Is Camera Ray"], mix.inputs[0])
+    tree.links.new(ambient.outputs[0], mix.inputs[1])
+    tree.links.new(seen.outputs[0], mix.inputs[2])
+    tree.links.new(mix.outputs[0], out_node.inputs[0])
     scene.world = world
 
     helper = bpy.data.collections.new("Studio")
@@ -585,6 +647,8 @@ def setup_studio(scene, objects):
     bsdf.inputs["Base Color"].default_value = (BACKDROP_GREY,) * 3 + (1.0,)
     bsdf.inputs["Roughness"].default_value = 0.9
     floor.data.materials.append(mat)
+    if hasattr(floor, "is_shadow_catcher"):     # zeigt nur den Schatten
+        floor.is_shadow_catcher = True
 
     def add_area(name, location, rotation, size, energy):
         data = bpy.data.lights.new(name, "AREA")
@@ -597,21 +661,51 @@ def setup_studio(scene, objects):
         obj.rotation_euler = [math.radians(a) for a in rotation]
         helper.objects.link(obj)
 
-    add_area("Licht_Key",  (-1.6, -1.9, 2.5), (48, 0, -40), (2.4, 2.0), 900)
-    add_area("Licht_Fill", ( 2.1, -1.5, 1.5), (68, 0,  55), (2.6, 2.2), 320)
-    add_area("Licht_Rim",  ( 0.4,  2.4, 2.2), (-60, 0,  0), (2.4, 1.4), 420)
+    add_area("Licht_Key",  (-1.6, -1.9, 2.5), (48, 0, -40), (2.4, 2.0), LIGHT_KEY)
+    add_area("Licht_Fill", ( 2.1, -1.5, 1.5), (68, 0,  55), (2.6, 2.2), LIGHT_FILL)
+    add_area("Licht_Rim",  ( 0.4,  2.4, 2.2), (-60, 0,  0), (2.4, 1.4), LIGHT_RIM)
     return helper
 
 
+def has_gl_context():
+    """EEVEE braucht im Hintergrund einen GL-Kontext ueber libEGL."""
+    import ctypes
+    for lib in ("libEGL.so.1", "libEGL.so"):
+        try:
+            ctypes.CDLL(lib)
+            return True
+        except OSError:
+            continue
+    return False
+
+
+def use_cycles(scene):
+    scene.render.engine = "CYCLES"
+    scene.cycles.device = "CPU"
+    scene.cycles.samples = RENDER_SAMPLES
+    scene.cycles.use_denoising = True
+    scene.cycles.max_bounces = 6
+    scene.cycles.caustics_reflective = False
+    scene.cycles.caustics_refractive = False
+
+
 def pick_engine(scene):
-    avail = {item.identifier for item in
-             bpy.types.RenderSettings.bl_rna.properties["engine"].enum_items}
-    for candidate in ("BLENDER_EEVEE_NEXT", "BLENDER_EEVEE", "CYCLES"):
-        if candidate in avail:
-            scene.render.engine = candidate
+    try:                                       # Cycles ist im bpy-Modul ein Addon
+        import addon_utils
+        addon_utils.enable("cycles", default_set=True)
+    except Exception as exc:                   # pragma: no cover - je nach Build
+        log("Cycles nicht aktivierbar: %s" % exc)
+    # Ohne GL-Kontext (libEGL) bricht EEVEE hart ab, deshalb dann Cycles zuerst.
+    order = ("BLENDER_EEVEE_NEXT", "BLENDER_EEVEE", "CYCLES") if has_gl_context() \
+        else ("CYCLES", "BLENDER_EEVEE_NEXT", "BLENDER_EEVEE")
+    for candidate in order:
+        try:
+            scene.render.engine = candidate    # die Enum-Liste ist nicht verlaesslich
             break
+        except TypeError:
+            continue
     if scene.render.engine == "CYCLES":
-        scene.cycles.samples = RENDER_SAMPLES
+        use_cycles(scene)
     else:
         eevee = scene.eevee
         for attr, value in (("taa_render_samples", RENDER_SAMPLES),
@@ -633,6 +727,30 @@ def scene_bounds(objects):
                 lo[i] = min(lo[i], world[i])
                 hi[i] = max(hi[i], world[i])
     return Vector(lo), Vector(hi)
+
+
+def frame_camera(cam, objects, margin=1.12):
+    """Kamera auf die Bounding-Box einpassen - je Ansicht statt fester Skala."""
+    rot = cam.matrix_world.to_3x3()
+    inv = rot.transposed()
+    corners = [obj.matrix_world @ Vector(c)
+               for obj in objects for c in obj.bound_box]
+    pts = [inv @ (p - cam.matrix_world.translation) for p in corners]
+
+    # seitlich zentrieren
+    offset_x = (max(p.x for p in pts) + min(p.x for p in pts)) / 2.0
+    offset_y = (max(p.y for p in pts) + min(p.y for p in pts)) / 2.0
+    cam.location = cam.location + rot @ Vector((offset_x, offset_y, 0.0))
+    pts = [Vector((p.x - offset_x, p.y - offset_y, p.z)) for p in pts]
+
+    half_w = max(abs(p.x) for p in pts)
+    half_h = max(abs(p.y) for p in pts)
+    if cam.data.type == "ORTHO":
+        cam.data.ortho_scale = 2.0 * max(half_w, half_h) * margin
+        return
+    tan_a = (cam.data.sensor_width / 2.0) / cam.data.lens     # quadratisches Bild
+    shift = max(max(abs(p.x), abs(p.y)) / tan_a * margin + p.z for p in pts)
+    cam.location = cam.location + rot @ Vector((0.0, 0.0, shift))
 
 
 def render_views(scene, objects, helper_coll, tag=""):
@@ -660,10 +778,8 @@ def render_views(scene, objects, helper_coll, tag=""):
     for name, kind, location, rotation in views:
         data = bpy.data.cameras.new("Kamera_" + name)
         data.type = kind
-        if kind == "ORTHO":
-            data.ortho_scale = span * 1.18
-        else:
-            data.lens = 52.0
+        data.lens = 50.0
+        data.ortho_scale = span * 1.2                  # wird gleich eingepasst
         cam = bpy.data.objects.new("Kamera_" + name, data)
         cam.location = location
         if rotation is None:                      # schraeg: auf die Mitte ausrichten
@@ -672,10 +788,18 @@ def render_views(scene, objects, helper_coll, tag=""):
         else:
             cam.rotation_euler = [math.radians(a) for a in rotation]
         helper_coll.objects.link(cam)
+        bpy.context.view_layer.update()                # Matrix vor dem Einpassen
+        frame_camera(cam, objects)
         scene.camera = cam
         path = os.path.join(RENDER_DIR, "%s%s.png" % (name, tag))
         scene.render.filepath = path
-        bpy.ops.render.render(write_still=True)
+        try:
+            bpy.ops.render.render(write_still=True)
+        except RuntimeError as exc:                # EEVEE braucht einen GL-Kontext
+            log("Render mit %s fehlgeschlagen (%s) - wechsle auf Cycles"
+                % (scene.render.engine, exc))
+            use_cycles(scene)
+            bpy.ops.render.render(write_still=True)
         written.append(path)
         log("gerendert: %s" % os.path.basename(path))
     return written
@@ -829,9 +953,9 @@ def verify_glb(path):
 
 def main():
     scene = reset_scene()
-    coll, objects = build_desk(scene)
+    objects = build_desk(scene)
     pick_engine(scene)
-    helper = setup_studio(scene, objects)
+    helper = setup_studio(scene)
 
     report = check_model(objects)
     log("Masse: %s m" % " x ".join("%.3f" % v for v in report["size"]))

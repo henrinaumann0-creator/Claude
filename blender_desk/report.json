@@ -1,0 +1,228 @@
+{
+  "bbox_min": [
+    -0.699999988079071,
+    -0.3499999940395355,
+    0.0
+  ],
+  "bbox_max": [
+    0.699999988079071,
+    0.3499999940395355,
+    0.75
+  ],
+  "size": [
+    1.399999976158142,
+    0.699999988079071,
+    0.75
+  ],
+  "object_count": 22,
+  "problems": [],
+  "triangles": 1832,
+  "non_manifold_edges": 0,
+  "loose_vertices": 0,
+  "duplicate_vertices": 0,
+  "objects_with_inverted_normals": 0,
+  "parts": {
+    "Platte": {
+      "tris": 188,
+      "non_manifold": 0,
+      "loose": 0,
+      "doubles": 0,
+      "volume": 0.031316912,
+      "normals_inverted": false
+    },
+    "Bein_vorne_links": {
+      "tris": 132,
+      "non_manifold": 0,
+      "loose": 0,
+      "doubles": 0,
+      "volume": 0.003076808,
+      "normals_inverted": false
+    },
+    "Bein_hinten_links": {
+      "tris": 132,
+      "non_manifold": 0,
+      "loose": 0,
+      "doubles": 0,
+      "volume": 0.003076808,
+      "normals_inverted": false
+    },
+    "Bein_vorne_rechts": {
+      "tris": 132,
+      "non_manifold": 0,
+      "loose": 0,
+      "doubles": 0,
+      "volume": 0.003076809,
+      "normals_inverted": false
+    },
+    "Bein_hinten_rechts": {
+      "tris": 132,
+      "non_manifold": 0,
+      "loose": 0,
+      "doubles": 0,
+      "volume": 0.003076807,
+      "normals_inverted": false
+    },
+    "Zarge_hinten": {
+      "tris": 20,
+      "non_manifold": 0,
+      "loose": 0,
+      "doubles": 0,
+      "volume": 0.002773401,
+      "normals_inverted": false
+    },
+    "Zarge_links": {
+      "tris": 20,
+      "non_manifold": 0,
+      "loose": 0,
+      "doubles": 0,
+      "volume": 0.001180569,
+      "normals_inverted": false
+    },
+    "Zarge_rechts": {
+      "tris": 20,
+      "non_manifold": 0,
+      "loose": 0,
+      "doubles": 0,
+      "volume": 0.001180569,
+      "normals_inverted": false
+    },
+    "Frontleiste": {
+      "tris": 20,
+      "non_manifold": 0,
+      "loose": 0,
+      "doubles": 0,
+      "volume": 0.000288897,
+      "normals_inverted": false
+    },
+    "Mittelsteg": {
+      "tris": 108,
+      "non_manifold": 0,
+      "loose": 0,
+      "doubles": 0,
+      "volume": 8.437e-05,
+      "normals_inverted": false
+    },
+    "Schubfront_links": {
+      "tris": 140,
+      "non_manifold": 0,
+      "loose": 0,
+      "doubles": 0,
+      "volume": 0.00109796,
+      "normals_inverted": false
+    },
+    "Griff_links": {
+      "tris": 276,
+      "non_manifold": 0,
+      "loose": 0,
+      "doubles": 0,
+      "volume": 2.2406e-05,
+      "normals_inverted": false
+    },
+    "Kasten_links_Seite_links": {
+      "tris": 12,
+      "non_manifold": 0,
+      "loose": 0,
+      "doubles": 0,
+      "volume": 0.000545998,
+      "normals_inverted": false
+    },
+    "Kasten_links_Seite_rechts": {
+      "tris": 12,
+      "non_manifold": 0,
+      "loose": 0,
+      "doubles": 0,
+      "volume": 0.000546,
+      "normals_inverted": false
+    },
+    "Kasten_links_Rueckwand": {
+      "tris": 12,
+      "non_manifold": 0,
+      "loose": 0,
+      "doubles": 0,
+      "volume": 0.000560195,
+      "normals_inverted": false
+    },
+    "Kasten_links_Boden": {
+      "tris": 12,
+      "non_manifold": 0,
+      "loose": 0,
+      "doubles": 0,
+      "volume": 0.001502074,
+      "normals_inverted": false
+    },
+    "Schubfront_rechts": {
+      "tris": 140,
+      "non_manifold": 0,
+      "loose": 0,
+      "doubles": 0,
+      "volume": 0.00109796,
+      "normals_inverted": false
+    },
+    "Griff_rechts": {
+      "tris": 276,
+      "non_manifold": 0,
+      "loose": 0,
+      "doubles": 0,
+      "volume": 2.2406e-05,
+      "normals_inverted": false
+    },
+    "Kasten_rechts_Seite_links": {
+      "tris": 12,
+      "non_manifold": 0,
+      "loose": 0,
+      "doubles": 0,
+      "volume": 0.000546,
+      "normals_inverted": false
+    },
+    "Kasten_rechts_Seite_rechts": {
+      "tris": 12,
+      "non_manifold": 0,
+      "loose": 0,
+      "doubles": 0,
+      "volume": 0.000545998,
+      "normals_inverted": false
+    },
+    "Kasten_rechts_Rueckwand": {
+      "tris": 12,
+      "non_manifold": 0,
+      "loose": 0,
+      "doubles": 0,
+      "volume": 0.000560195,
+      "normals_inverted": false
+    },
+    "Kasten_rechts_Boden": {
+      "tris": 12,
+      "non_manifold": 0,
+      "loose": 0,
+      "doubles": 0,
+      "volume": 0.001502074,
+      "normals_inverted": false
+    }
+  },
+  "glb": {
+    "objects": 22,
+    "triangles": 1832,
+    "size": [
+      1.4,
+      0.7,
+      0.75
+    ],
+    "bbox_min": [
+      -0.7,
+      -0.35,
+      0.0
+    ],
+    "materials": [
+      "Holz_Innen",
+      "Holz_Nussbaum",
+      "Messing"
+    ],
+    "within_budget": true,
+    "size_ok": true
+  },
+  "files": {
+    "blend": 654358,
+    "glb": 95528,
+    "viewer": 150571
+  }
+}
