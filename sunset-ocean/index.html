@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sunset Ocean</title>
+<style>
+html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#1a1620;}
+canvas{display:block;width:100vw;height:100vh;}
+#ui{position:fixed;left:16px;bottom:16px;padding:10px 14px 8px;border-radius:10px;
+background:rgba(12,14,26,0.58);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+color:#f6efe6;font:12px/1.3 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+box-shadow:0 2px 12px rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.12);user-select:none;z-index:2}
+#ui label{display:block;margin:2px 0 6px;letter-spacing:.02em}
+#ui .row{display:flex;justify-content:space-between;gap:12px}
+#ui span.v{opacity:.8;font-variant-numeric:tabular-nums}
+#ui input{width:170px;margin:3px 0 0;accent-color:#ffb27a;display:block}
+</style>
+<script>
+window.BridgeBenchTaskManifest = {
+  benchmarkVersion: "3.0",
+  taskId: "s1-sunset-ocean",
+  title: "Sunset Ocean",
+  category: "simulation",
+  controls: ["sea-state", "sun-elevation"],
+  deterministic: true,
+  preferredViewport: { width: 1280, height: 800 }
+};
+</script>
+<script type="importmap">
+{"imports":{"three":"/vendor/three@0.182.0/three.module.min.js","three/addons/":"/vendor/three@0.182.0/addons/"}}
+</script>
+</head>
+<body>
+<div id="ui">
+  <label><div class="row"><span>Sea State</span><span class="v" id="seaV">0.50</span></div>
+    <input id="sea" type="range" min="0" max="1" step="0.01" value="0.5" data-bb-control="sea-state"></label>
+  <label><div class="row"><span>Sun Elevation</span><span class="v" id="sunV">4.0°</span></div>
+    <input id="sun" type="range" min="1" max="12" step="0.1" value="4" data-bb-control="sun-elevation"></label>
+</div>
+<script type="module">
+import * as THREE from 'three';
+
+const DEG = Math.PI / 180;
+const lerp = (a, b, t) => a + (b - a) * t;
+const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+
+// ---------- renderer / scene ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.1, 80000);
+camera.rotation.order = 'YXZ';
+camera.position.set(0, 2.8, 0);
+
+const cubeRT = new THREE.WebGLCubeRenderTarget(256, { type: THREE.HalfFloatType, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });
+const cubeCam = new THREE.CubeCamera(0.5, 100000, cubeRT);
+
+// ---------- shared uniforms ----------
+const U = {
+  uSunDir: { value: new THREE.Vector3(0, 0.07, -1).normalize() },
+  uSunCol: { value: new THREE.Vector3(1, 0.6, 0.3) },
+  uT: { value: 0.27 },
+  uTime: { value: 0 },
+  uCloudOff: { value: new THREE.Vector2(0, 0) },
+  uCube: { value: 0 }
+};
+
+const COMMON = `
+uniform vec3 uSunDir; uniform vec3 uSunCol; uniform float uT; uniform float uTime; uniform vec2 uCloudOff; uniform float uCube;
+float hash12(vec2 p){ vec3 p3=fract(vec3(p.xyx)*0.1031); p3+=dot(p3,p3.yzx+33.33); return fract((p3.x+p3.y)*p3.z); }
+float vnoise(vec2 p){ vec2 i=floor(p), f=fract(p); vec2 u=f*f*(3.-2.*f);
+  return mix(mix(hash12(i),hash12(i+vec2(1.,0.)),u.x), mix(hash12(i+vec2(0.,1.)),hash12(i+vec2(1.,1.)),u.x), u.y); }
+float fbm(vec2 p){ float s=0., a=0.5; mat2 m=mat2(1.6,1.2,-1.2,1.6);
+  for(int i=0;i<5;i++){ s+=a*vnoise(p); p=m*p+vec2(3.1,1.7); a*=0.5; } return s; }
+vec4 clouds(vec3 d, float mu, float az, vec3 hor){
+  float y=d.y; if(y<0.004) return vec4(0.);
+  vec2 p=d.xz/(y+0.04);
+  vec2 o=uCloudOff+vec2(uTime*0.006,uTime*0.0015);
+  float cov=vnoise(p*0.16+o*0.3);
+  vec2 q=mat2(0.93,-0.36,0.36,0.93)*p;
+  float na=fbm(vec2(q.x*0.42,q.y*2.3)+o);
+  float da=smoothstep(0.54,0.84,na+0.22*(cov-0.5));
+  vec2 pb=p*0.85+o*1.3+11.;
+  float nb=fbm(pb);
+  float db=smoothstep(0.60,0.90,nb+0.3*(cov-0.5));
+  vec2 sunP=uSunDir.xz/(uSunDir.y+0.04);
+  vec2 toS=normalize(sunP-p+1e-5);
+  float nbl=fbm(pb+toS*0.3);
+  float litB=clamp(0.45+(nb-nbl)*3.5,0.,1.);
+  litB=max(litB,1.-smoothstep(0.,0.75,db));
+  float fw=pow(max(mu,0.),5.);
+  vec3 rose=mix(vec3(1.0,0.50,0.56),vec3(1.0,0.72,0.66),uT);
+  vec3 lit=mix(rose*0.95,uSunCol*vec3(1.2,1.0,0.85)*1.3,clamp(fw*0.7+0.25,0.,1.))*(0.9+2.4*fw);
+  vec3 shade=mix(vec3(0.34,0.27,0.40),vec3(0.38,0.42,0.58),uT)*(0.85+0.45*az);
+  vec3 ca=mix(shade*1.2,lit,0.45+0.55*(1.-da));
+  vec3 cb=mix(shade,lit*1.1,litB);
+  float ang=acos(clamp(mu,-1.,1.));
+  float room=mix(0.3,1.,smoothstep(0.04,0.28,ang));
+  float hf=smoothstep(0.004,0.07,y);
+  float aa=da*0.55*room*hf, ab=db*0.9*room*hf;
+  float a=ab+aa*(1.-ab);
+  vec3 col=(cb*ab+ca*aa*(1.-ab))/max(a,1e-4);
+  col=mix(col,hor,0.5*(1.-smoothstep(0.02,0.25,y)));
+  return vec4(col,a);
+}
+vec3 skyColor(vec3 d, float disc){
+  float y=d.y, yc=max(y,0.);
+  float mu=dot(d,uSunDir);
+  vec2 dh=normalize(d.xz+vec2(1e-5)); vec2 sh=normalize(uSunDir.xz);
+  float az=dot(dh,sh)*.5+.5;
+  vec3 horSun=mix(vec3(1.35,0.62,0.30),vec3(1.2,0.86,0.62),uT);
+  vec3 horAnti=mix(vec3(0.62,0.46,0.58),vec3(0.66,0.68,0.82),uT);
+  vec3 hor=mix(horAnti,horSun,az*az);
+  vec3 mid=mix(vec3(0.70,0.42,0.50),vec3(0.52,0.58,0.80),uT);
+  vec3 zen=mix(vec3(0.10,0.16,0.36),vec3(0.13,0.27,0.58),uT);
+  float hz=sqrt(yc);
+  vec3 c=mix(hor,mid,smoothstep(0.,0.35,hz));
+  c=mix(c,zen,smoothstep(0.25,0.9,hz));
+  float m=max(mu,0.);
+  float lowf=1.-smoothstep(0.,0.5,yc);
+  c+=uSunCol*(0.28*pow(m,4.)*lowf+0.8*pow(m,40.)+2.2*pow(m,500.));
+  vec4 cl=clouds(d,mu,az,hor);
+  c=mix(c,cl.rgb,cl.a);
+  float sd=smoothstep(0.99994,0.99997,mu);
+  c+=disc*sd*(1.-cl.a*0.8)*uSunCol*vec3(1.,0.93,0.8)*26.;
+  if(y<0.) c=mix(c,hor*0.6,smoothstep(0.,-0.2,y));
+  return c;
+}
+`;
+
+// ---------- sky ----------
+const skyMat = new THREE.ShaderMaterial({
+  uniforms: U,
+  side: THREE.BackSide, depthWrite: false, depthTest: false,
+  vertexShader: `varying vec3 vWorld; void main(){ vec4 wp=modelMatrix*vec4(position,1.); vWorld=wp.xyz; gl_Position=projectionMatrix*viewMatrix*wp; }`,
+  fragmentShader: COMMON + `
+varying vec3 vWorld;
+void main(){
+  vec3 d=normalize(vWorld-cameraPosition);
+  vec3 c=skyColor(d,1.-uCube);
+  gl_FragColor=vec4(c,1.);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+  gl_FragColor.rgb+=(hash12(gl_FragCoord.xy)-0.5)/255.*(1.-uCube);
+}`
+});
+const sky = new THREE.Mesh(new THREE.SphereGeometry(40000, 64, 32), skyMat);
+sky.renderOrder = -1; sky.frustumCulled = false;
+scene.add(sky);
+
+// ---------- water ----------
+const NW = 8, NR = 16;
+const WL = [62, 41, 27, 17.5, 11.3, 7.2, 4.6, 3.0];
+const wBase = new Array(NW).fill(0);
+const WU = {
+  uEnv: { value: cubeRT.texture },
+  uW: { value: Array.from({ length: NW }, () => new THREE.Vector4()) },
+  uAmp: { value: new Array(NW).fill(0) },
+  uQA: { value: new Array(NW).fill(0) },
+  uR: { value: Array.from({ length: NR }, () => new THREE.Vector4()) },
+  uRK: { value: new Array(NR).fill(0) },
+  uRip: { value: 0.8 }, uFoam: { value: 0 }, uSea: { value: 0.5 },
+  uAmb: { value: new THREE.Vector3(1, 0.8, 0.75) }, uSunI: { value: 2.6 }, uSumAmp: { value: 1 }
+};
+const waterMat = new THREE.ShaderMaterial({
+  uniforms: Object.assign({}, U, WU),
+  side: THREE.DoubleSide,
+  vertexShader: `
+uniform vec4 uW[8]; uniform float uAmp[8]; uniform float uQA[8]; uniform float uTime; uniform float uSumAmp;
+varying vec2 vP; varying vec3 vWorld; varying float vH;
+void main(){
+  vec4 wp=modelMatrix*vec4(position,1.);
+  vec2 P=wp.xz; float dist=length(P-cameraPosition.xz);
+  vec3 d=vec3(0.);
+  for(int i=0;i<8;i++){
+    vec4 w=uW[i]; float k=w.z; float L=6.2832/k;
+    float f=1.-smoothstep(L*5.,L*10.,dist);
+    float th=k*dot(w.xy,P)-sqrt(9.81*k)*uTime+w.w;
+    float c=cos(th);
+    d.x+=uQA[i]*f*w.x*c; d.z+=uQA[i]*f*w.y*c; d.y+=uAmp[i]*f*sin(th);
+  }
+  wp.xyz+=d; vP=P; vWorld=wp.xyz; vH=d.y/max(uSumAmp,0.01);
+  gl_Position=projectionMatrix*viewMatrix*wp;
+}`,
+  fragmentShader: COMMON + `
+uniform samplerCube uEnv; uniform vec4 uW[8]; uniform float uAmp[8]; uniform float uQA[8];
+uniform vec4 uR[16]; uniform float uRK[16]; uniform float uRip; uniform float uFoam; uniform float uSea;
+uniform vec3 uAmb; uniform float uSunI;
+varying vec2 vP; varying vec3 vWorld; varying float vH;
+void main(){
+  vec2 P=vP;
+  float fp=max(length(dFdx(P)),length(dFdy(P)))+1e-4;
+  vec3 T=vec3(1.,0.,0.), B=vec3(0.,0.,1.);
+  float vr=0.;
+  for(int i=0;i<8;i++){
+    vec4 w=uW[i]; float k=w.z;
+    float th=k*dot(w.xy,P)-sqrt(9.81*k)*uTime+w.w;
+    float f=1.-smoothstep(0.35,1.4,k*fp);
+    float a=uAmp[i]*f, qa=uQA[i]*f;
+    float s=sin(th), c=cos(th);
+    T+=vec3(-qa*k*w.x*w.x*s, a*k*w.x*c, -qa*k*w.x*w.y*s);
+    B+=vec3(-qa*k*w.x*w.y*s, a*k*w.y*c, -qa*k*w.y*w.y*s);
+    float ka=k*uAmp[i]; vr+=(1.-f)*0.5*ka*ka;
+  }
+  float J=T.x*B.z-T.z*B.x;
+  vec3 N=normalize(cross(B,T));
+  vec2 sl=vec2(0.);
+  for(int j=0;j<16;j++){
+    vec4 r=uR[j]; float k=r.z;
+    float th=k*dot(r.xy,P)-sqrt(9.81*k)*uTime+r.w;
+    float f=1.-smoothstep(0.3,1.2,k*fp);
+    float ka=uRK[j]*uRip;
+    sl+=r.xy*(ka*cos(th)*f); vr+=(1.-f)*0.5*ka*ka;
+  }
+  N=normalize(N+vec3(-sl.x,0.,-sl.y));
+  vec3 V=normalize(cameraPosition-vWorld);
+  float dist=length(cameraPosition.xz-vWorld.xz);
+  vec3 L=uSunDir;
+  float nv=clamp(dot(N,V),0.,1.);
+  float F=0.02+0.98*pow(1.-nv,5.);
+  vec3 R=reflect(-V,N); R.y=abs(R.y);
+  vec3 refl=textureCube(uEnv,R,clamp(vr*30.,0.,3.)).rgb;
+  vec3 H=normalize(V+L); float nh=max(dot(N,H),1e-3);
+  float m2=0.0010+2.*vr+0.0015*uSea;
+  float nh2=nh*nh;
+  float D=exp(-(1.-nh2)/(nh2*m2))/(3.14159*m2*nh2*nh2);
+  float Fh=0.02+0.98*pow(1.-max(dot(V,H),0.),5.);
+  float nl=dot(N,L);
+  vec3 spec=uSunCol*uSunI*D*Fh/(4.*max(nv,0.2))*smoothstep(-0.02,0.08,nl);
+  float hN=clamp(vH*0.5+0.5,0.,1.);
+  vec3 deep=vec3(0.018,0.075,0.095), turq=vec3(0.06,0.30,0.28);
+  vec3 body=(deep+turq*0.2*hN)*uAmb*(0.75+0.35*N.y);
+  vec2 vh=normalize(-V.xz+1e-5), lh=normalize(L.xz);
+  float bt=pow(max(dot(vh,lh),0.),3.);
+  vec3 sss=turq*uSunCol*(0.5*bt*hN*hN*(0.4+min((1.-N.y)*4.,1.)))*(0.5+0.5*uSea);
+  vec3 col=mix(body+sss,refl,F)+spec;
+  float fn=vnoise(P*0.55+vec2(uTime*0.05,0.)+uCloudOff)*0.6+vnoise(P*2.3-uTime*0.12)*0.4;
+  float fm=smoothstep(0.55,0.2,J)*uFoam*smoothstep(0.38,0.75,fn)*(1.-smoothstep(0.3,2.5,fp));
+  vec3 foamCol=uAmb*0.62+uSunCol*0.3*max(nl,0.)+turq*0.1;
+  col=mix(col,foamCol,clamp(fm,0.,0.88));
+  vec3 hz=textureCube(uEnv,normalize(vec3(-V.x,0.012,-V.z))).rgb;
+  float fg=1.-exp(-dist*0.0001);
+  col=mix(col,hz,fg*0.88);
+  gl_FragColor=vec4(col,1.);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+  gl_FragColor.rgb+=(hash12(gl_FragCoord.xy)-0.5)/255.;
+}`
+});
+
+function buildOceanGeometry() {
+  const SA = 384, SR = 330;
+  const pos = new Float32Array((SA + 1) * (SR + 1) * 3);
+  let n = 0;
+  for (let i = 0; i <= SR; i++) {
+    const r = i === 0 ? 0 : 1.2 * (Math.pow(1.031, i) - 1);
+    for (let j = 0; j <= SA; j++) {
+      const a = j / SA * Math.PI * 2;
+      pos[n++] = Math.cos(a) * r; pos[n++] = 0; pos[n++] = Math.sin(a) * r;
+    }
+  }
+  const idx = new Uint32Array(SR * SA * 6); let m = 0;
+  for (let i = 0; i < SR; i++) for (let j = 0; j < SA; j++) {
+    const a = i * (SA + 1) + j, b = a + SA + 1;
+    idx[m++] = a; idx[m++] = b; idx[m++] = a + 1;
+    idx[m++] = b; idx[m++] = b + 1; idx[m++] = a + 1;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setIndex(new THREE.BufferAttribute(idx, 1));
+  return g;
+}
+const oceanGeo = buildOceanGeometry();
+const water = new THREE.Mesh(oceanGeo, waterMat);
+water.frustumCulled = false;
+scene.add(water);
+
+// ---------- state ----------
+const target = { sea: 0.5, sun: 4 };
+const cur = { sea: 0.5, sun: 4 };
+let seed = 1, epoch = null, lastTs = null, raf = 0, running = true;
+
+function buildWaves(s) {
+  const rng = mulberry32((s >>> 0) ^ 0x9E3779B9);
+  const wind = 0.3 + (rng() - 0.5) * 0.3;
+  for (let i = 0; i < NW; i++) {
+    const ang = wind + (rng() - 0.5) * (i < 3 ? 0.7 : 1.6);
+    const k = 2 * Math.PI / (WL[i] * (0.94 + 0.12 * rng()));
+    WU.uW.value[i].set(Math.sin(ang), Math.cos(ang), k, rng() * Math.PI * 2);
+    wBase[i] = Math.pow(WL[i] / 60, 0.85) * (0.75 + 0.35 * rng());
+  }
+  for (let j = 0; j < NR; j++) {
+    const ang = wind + (rng() - 0.5) * 2.6;
+    const L = 2.4 * Math.pow(0.86, j) * (0.9 + 0.2 * rng());
+    WU.uR.value[j].set(Math.sin(ang), Math.cos(ang), 2 * Math.PI / L, rng() * Math.PI * 2);
+    WU.uRK.value[j] = 0.05 * (0.7 + 0.6 * rng());
+  }
+  U.uCloudOff.value.set(rng() * 60, rng() * 60);
+}
+
+function applyParams(t) {
+  // sea
+  const s = cur.sea;
+  const A = lerp(0.22, 0.72, s), steep = lerp(0.3, 0.85, s);
+  let sum = 0;
+  for (let i = 0; i < NW; i++) {
+    const a = A * wBase[i], k = WU.uW.value[i].z;
+    WU.uAmp.value[i] = a;
+    WU.uQA.value[i] = Math.min(a, steep / (k * NW));
+    sum += a;
+  }
+  WU.uSumAmp.value = sum;
+  WU.uRip.value = lerp(0.55, 1.05, s);
+  WU.uFoam.value = smooth(0.45, 0.95, s);
+  WU.uSea.value = s;
+  // sun
+  const et = (cur.sun - 1) / 11;
+  const hfov = 2 * Math.atan(Math.tan(camera.fov * DEG / 2) * camera.aspect);
+  const az = Math.min(8 * DEG, hfov * 0.3);
+  const el = cur.sun * DEG;
+  U.uSunDir.value.set(Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el));
+  const ct = Math.pow(et, 0.8);
+  U.uSunCol.value.set(1.0, lerp(0.46, 0.80, ct), lerp(0.18, 0.58, ct));
+  U.uT.value = et;
+  WU.uAmb.value.set(lerp(0.95, 0.80, et), lerp(0.72, 0.88, et), lerp(0.66, 1.0, et));
+  WU.uSunI.value = lerp(2.3, 3.4, et);
+  renderer.toneMappingExposure = lerp(1.25, 1.05, et);
+  // camera: always well above the highest possible crest
+  camera.position.set(0, Math.max(2.3, sum + 1.3), 0);
+  camera.rotation.set(-3 * DEG + 0.0012 * Math.sin(t * 0.37), 0, 0.0008 * Math.sin(t * 0.29 + 1.0));
+  camera.updateMatrixWorld();
+  sky.position.copy(camera.position);
+  cubeCam.position.copy(camera.position);
+}
+
+function frame(ts) {
+  if (!running) return;
+  raf = requestAnimationFrame(frame);
+  if (epoch === null) { epoch = ts; lastTs = ts; }
+  const t = (ts - epoch) / 1000;
+  const dt = Math.min(0.1, Math.max(0, (ts - lastTs) / 1000)); lastTs = ts;
+  const kf = 1 - Math.exp(-dt * 3.5);
+  cur.sea += (target.sea - cur.sea) * kf;
+  cur.sun += (target.sun - cur.sun) * kf;
+  if (Math.abs(target.sea - cur.sea) < 1e-4) cur.sea = target.sea;
+  if (Math.abs(target.sun - cur.sun) < 1e-4) cur.sun = target.sun;
+  U.uTime.value = t;
+  applyParams(t);
+  water.visible = false; U.uCube.value = 1;
+  cubeCam.update(renderer, scene);
+  U.uCube.value = 0; water.visible = true;
+  renderer.render(scene, camera);
+}
+
+// ---------- UI ----------
+const seaEl = document.getElementById('sea'), sunEl = document.getElementById('sun');
+const seaV = document.getElementById('seaV'), sunV = document.getElementById('sunV');
+function syncUI() {
+  seaEl.value = String(target.sea); sunEl.value = String(target.sun);
+  seaV.textContent = target.sea.toFixed(2); sunV.textContent = target.sun.toFixed(1) + '°';
+}
+const onSea = () => { target.sea = Math.min(1, Math.max(0, parseFloat(seaEl.value))); seaV.textContent = target.sea.toFixed(2); };
+const onSun = () => { target.sun = Math.min(12, Math.max(1, parseFloat(sunEl.value))); sunV.textContent = target.sun.toFixed(1) + '°'; };
+seaEl.addEventListener('input', onSea); sunEl.addEventListener('input', onSun);
+
+function onResize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+  renderer.setSize(w, h);
+}
+window.addEventListener('resize', onResize);
+
+function reset(s) {
+  seed = Number.isFinite(Number(s)) ? (Number(s) >>> 0) : 1;
+  target.sea = 0.5; target.sun = 4; cur.sea = 0.5; cur.sun = 4;
+  buildWaves(seed);
+  syncUI();
+  epoch = null; lastTs = null;
+  applyParams(0);
+}
+
+window.BridgeBenchTaskApi = {
+  init() {},
+  reset(s) { reset(s); },
+  getState() { return { seaState: target.sea, sunElevation: target.sun }; },
+  getScore() { return null; },
+  destroy() {
+    running = false;
+    cancelAnimationFrame(raf);
+    window.removeEventListener('resize', onResize);
+    seaEl.removeEventListener('input', onSea); sunEl.removeEventListener('input', onSun);
+    oceanGeo.dispose(); sky.geometry.dispose(); waterMat.dispose(); skyMat.dispose();
+    cubeRT.dispose(); renderer.dispose();
+  }
+};
+
+reset(1);
+raf = requestAnimationFrame(frame);
+</script>
+</body>
+</html>
