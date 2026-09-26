@@ -162,9 +162,12 @@
 
   /* ───────────────────────────── menus ───────────────────────────── */
   .menu {
-    position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
     background: rgba(0,0,0,.6); pointer-events: auto; overflow: auto; padding: 16px;
   }
+  /* Centre vertically when there is room, but stay scrollable (never clip the top) on short windows. */
+  .menu > :first-child { margin-top: auto; }
+  .menu > :last-child { margin-bottom: auto; }
   #mainMenu { background: linear-gradient(#2c4f7c, #6b8fbf 55%, #4d7a2c 55%, #3a5e1f); }
   .title { font-size: 54px; letter-spacing: 3px; color: #ddd; text-shadow: 4px 4px 0 #3f3f3f; margin: 0 0 4px; font-weight: bold; }
   .subtitle { color: #ff0; text-shadow: 2px 2px 0 #3f3f00; margin-bottom: 18px; transform: rotate(-4deg); }
@@ -2782,7 +2785,7 @@ const Blocks = {
     }
     if (id === B.cactus) return below === B.sand || below === B.cactus;
     if (id === B.nether_wart) return below === B.soul_sand;
-    if (def.plant) return below === B.grass_block || below === B.dirt || below === B.farmland || below === B.snowy_grass_block || below === B.sand && id === B.dead_bush || below === B.podzol;
+    if (def.plant) return below === B.grass_block || below === B.dirt || below === B.farmland || below === B.snowy_grass_block || below === B.sand && id === B.dead_bush;
     if (id === B.fire) return true;
     if (def.shape === 'torch' || def.shape === 'lever' || def.shape === 'button' || def.shape === 'ladder') {
       const m = w.getMeta(x, y, z) & 7;
@@ -2974,11 +2977,12 @@ const Light = {
       const tops = new Int16Array(256);
       for (let lz = 0; lz < 16; lz++) for (let lx = 0; lx < 16; lx++) {
         let v = 15, y = HEIGHT - 1;
+        // Full sky light only travels straight down through unfiltered cells; from the
+        // first opaque/filtering block on, the flood fill below applies the same
+        // "-1 - filter" rule that incremental updates use.
         for (; y >= 0; y--) {
           const i = idx(lx, y, lz), b = c.blocks[i];
-          if (OPAQUE[b]) break;
-          v -= FILTER[b];
-          if (v <= 0) break;
+          if (OPAQUE[b] || FILTER[b]) break;
           if ((c.light[i] >> 4) < v) this.set(c, i, true, v);
         }
         tops[lz * 16 + lx] = y;
@@ -3727,6 +3731,7 @@ const Renderer = {
         uv.setXY(i, (cx + 0.001 + u * 0.998) / cols, (cy + 0.001 + (1 - v) * 0.998) / cols);
       }
     }
+    g.userData.shared = true;
     this.itemGeoCache.set(key, g);
     return g;
   },
@@ -3750,7 +3755,7 @@ const Renderer = {
     let mesh;
     if (Tex.isCubeIcon(id)) mesh = new THREE.Mesh(this.blockItemGeometry(id), this.itemMaterial(id));
     else {
-      if (!this.itemGeoCache.has('plane')) this.itemGeoCache.set('plane', new THREE.PlaneGeometry(1, 1));
+      if (!this.itemGeoCache.has('plane')) { const pg = new THREE.PlaneGeometry(1, 1); pg.userData.shared = true; this.itemGeoCache.set('plane', pg); }
       mesh = new THREE.Mesh(this.itemGeoCache.get('plane'), this.itemMaterial(id));
       size *= 1.6;
     }
@@ -3772,7 +3777,7 @@ const Renderer = {
     if (id !== this.handId || this.refreshHand) {
       this.refreshHand = false;
       this.handId = id;
-      while (this.handPivot.children.length) this.handPivot.remove(this.handPivot.children[0]);
+      while (this.handPivot.children.length) { const old = this.handPivot.children[0]; this.handPivot.remove(old); disposeTree(old); }
       let m;
       if (!id) {
         m = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.7), new THREE.MeshLambertMaterial({ color: 0xc89a78 }));
@@ -4167,7 +4172,7 @@ class Player extends Entity {
     this.addExhaustion(0.1);
     HUD.flashHurt();
     Sound.play('hurt', this.x, this.y, this.z);
-    if (from) {
+    if (from && Number.isFinite(from.x) && Number.isFinite(from.z)) {
       const dx = this.x - from.x, dz = this.z - from.z, l = Math.hypot(dx, dz) || 1;
       this.vx = dx / l * 7; this.vz = dz / l * 7; this.vy = 6; this.knockTime = 0.25;
     }
@@ -4353,7 +4358,28 @@ class ItemEntity extends Entity {
     const b = world.brightness(Math.floor(this.x), Math.floor(this.y + 0.3), Math.floor(this.z), Renderer.daylight || 1);
     this.mesh.material.color.setScalar(0.25 + 0.75 * b);
   }
-  remove() { this.dead = true; Renderer.entityGroup.remove(this.mesh); }
+  remove() { this.dead = true; Renderer.entityGroup.remove(this.mesh); disposeTree(this.mesh); }
+}
+
+/**
+ * Free the GPU resources of a removed entity model. Geometries flagged
+ * userData.shared (cached, reused by many entities) and cached textures are
+ * kept; materials are per-entity clones and are always released.
+ */
+function disposeTree(obj) {
+  if (!obj) return;
+  obj.traverse((o) => {
+    if (o.geometry && !o.geometry.userData.shared) o.geometry.dispose();
+    for (const m of o.material ? [].concat(o.material) : []) { if (m.userData.ownsMap && m.map) m.map.dispose(); m.dispose(); }
+  });
+}
+const SHARED_GEO = new Map();
+/** Cached box geometry (shared between all entities). */
+function sharedBox(w, h, d) {
+  const k = w + ',' + h + ',' + d;
+  let g = SHARED_GEO.get(k);
+  if (!g) { g = new THREE.BoxGeometry(w, h, d); g.userData.shared = true; SHARED_GEO.set(k, g); }
+  return g;
 }
 
 // ─── Mob models ───────────────────────────────────────────────────────────
@@ -4394,7 +4420,7 @@ function mobPart(w, h, d, texKey, base, faceKey, faceBase) {
   const mats = [];
   for (let i = 0; i < 6; i++) mats.push(new THREE.MeshLambertMaterial({ map: tex }));
   if (faceKey) mats[4] = new THREE.MeshLambertMaterial({ map: MobTex.get(faceKey + '_face', faceBase || base, 0.12, FACE_DRAW[faceKey]) });
-  return new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mats);
+  return new THREE.Mesh(sharedBox(w, h, d), mats);
 }
 /** Limb pivoting at its top. */
 function mobLimb(w, h, d, texKey, base, x, y, z) {
@@ -4600,7 +4626,7 @@ class Mob extends Entity {
     }
     if (this.type === 'enderman' && this.health > 0 && Math.random() < 0.5) setTimeout(() => this.teleportRandom(Game.world), 0); this.invul = 0.5; this.hurtTime = 0.35; this.hpBarTime = 4;
     this.updateHpBar();
-    if (from) {
+    if (from && Number.isFinite(from.x) && Number.isFinite(from.z)) {
       const dx = this.x - from.x, dz = this.z - from.z, l = Math.hypot(dx, dz) || 1;
       const kb = from.knockback || 5;
       this.vx = dx / l * kb; this.vz = dz / l * kb; this.vy = 5.5; this.knockTime = 0.3;
@@ -4638,6 +4664,7 @@ class Mob extends Entity {
       const c = makeCanvas(32, 5);
       const t = new THREE.CanvasTexture(c); t.magFilter = t.minFilter = THREE.NearestFilter;
       this.hpBar = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true }));
+      this.hpBar.material.userData.ownsMap = true;
       this.hpBar.scale.set(0.8, 0.125, 1); this.hpBar.renderOrder = 50;
       this.hpBarCanvas = c; this.hpBarTex = t;
       Renderer.entityGroup.add(this.hpBar);
@@ -4650,9 +4677,11 @@ class Mob extends Entity {
     this.hpBarTex.needsUpdate = true;
   }
   remove() {
+    if (this.dead) return;
     this.dead = true;
     Renderer.entityGroup.remove(this.mesh);
-    if (this.hpBar) Renderer.entityGroup.remove(this.hpBar);
+    disposeTree(this.mesh);
+    if (this.hpBar) { Renderer.entityGroup.remove(this.hpBar); disposeTree(this.hpBar); }
   }
   distTo(e) { return Math.hypot(e.x - this.x, (e.y) - this.y, e.z - this.z); }
   /** Enderman-style random teleport to a standable spot within 16 blocks. (STUB: endermen don't carry blocks.) */
@@ -4948,8 +4977,8 @@ class Arrow {
     this.x = x; this.y = y; this.z = z; this.vx = vx; this.vy = vy; this.vz = vz;
     this.owner = owner; this.power = power; this.stuck = false; this.age = 0; this.dead = false;
     const g = new THREE.Group();
-    const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.6), new THREE.MeshLambertMaterial({ color: 0x8a6a3a }));
-    const tip = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.1), new THREE.MeshLambertMaterial({ color: 0xaaaaaa }));
+    const shaft = new THREE.Mesh(sharedBox(0.05, 0.05, 0.6), new THREE.MeshLambertMaterial({ color: 0x8a6a3a }));
+    const tip = new THREE.Mesh(sharedBox(0.08, 0.08, 0.1), new THREE.MeshLambertMaterial({ color: 0xaaaaaa }));
     tip.position.z = 0.3; g.add(shaft, tip);
     this.mesh = g;
     Renderer.entityGroup.add(g);
@@ -4965,6 +4994,7 @@ class Arrow {
     }
     this.vy -= 20 * dt;
     const sp = Math.hypot(this.vx, this.vy, this.vz);
+    if (sp < 1e-6) return; // momentarily at rest (apex of a vertical shot)
     const step = sp * dt;
     const dx = this.vx / sp, dy = this.vy / sp, dz = this.vz / sp;
     // Entity hits.
@@ -4990,7 +5020,7 @@ class Arrow {
     this.mesh.lookAt(this.x + dx, this.y + dy, this.z + dz);
     if (this.y < -64) this.remove();
   }
-  remove() { this.dead = true; Renderer.entityGroup.remove(this.mesh); }
+  remove() { this.dead = true; Renderer.entityGroup.remove(this.mesh); disposeTree(this.mesh); }
 }
 
 // ─── Primed TNT ───────────────────────────────────────────────────────────
@@ -5079,7 +5109,7 @@ class EnderDragon extends Mob {
     this.beam.visible = !!c && this.health < this.maxHealth;
     if (this.beam.visible) { const pos = this.beam.geometry.attributes.position; pos.setXYZ(0, c.x, c.y + 1, c.z); pos.setXYZ(1, this.x, this.y + 1.5, this.z); pos.needsUpdate = true; }
   }
-  remove() { super.remove(); Renderer.entityGroup.remove(this.beam); }
+  remove() { super.remove(); Renderer.entityGroup.remove(this.beam); this.beam.geometry.dispose(); this.beam.material.dispose(); }
 }
 
 // ─── Fireballs (ghasts: big & explosive, blazes: small & incendiary) ─────
@@ -5088,7 +5118,7 @@ class Fireball {
     this.x = x; this.y = y; this.z = z; this.vx = vx; this.vy = vy; this.vz = vz; this.owner = owner; this.big = big;
     this.age = 0; this.dead = false;
     const sz = big ? 0.9 : 0.35;
-    this.mesh = new THREE.Mesh(new THREE.BoxGeometry(sz, sz, sz), new THREE.MeshBasicMaterial({ color: big ? 0xff7a1a : 0xffb020 }));
+    this.mesh = new THREE.Mesh(sharedBox(sz, sz, sz), new THREE.MeshBasicMaterial({ color: big ? 0xff7a1a : 0xffb020 }));
     Renderer.entityGroup.add(this.mesh);
     this.r = sz / 2;
   }
@@ -5098,6 +5128,7 @@ class Fireball {
     this.age += dt;
     if (this.age > 12) { this.remove(); return; }
     const sp = Math.hypot(this.vx, this.vy, this.vz), step = sp * dt;
+    if (sp < 1e-6) return;
     const dx = this.vx / sp, dy = this.vy / sp, dz = this.vz / sp;
     const targets = this.owner === 'player' ? Game.entities.filter((e) => e instanceof Mob && e.deathTime < 0) : [player];
     let hitEnt = null;
@@ -5130,7 +5161,7 @@ class Fireball {
     this.mesh.rotation.x += dt * 5; this.mesh.rotation.y += dt * 4;
     if (Math.random() < 0.6) Renderer.emit(this.x, this.y, this.z, 1, [0.4, 0.4, 0.4], 0.2, 0.3, -1, 0.6);
   }
-  remove() { this.dead = true; Renderer.entityGroup.remove(this.mesh); }
+  remove() { this.dead = true; Renderer.entityGroup.remove(this.mesh); disposeTree(this.mesh); }
 }
 
 // ─── Thrown ender pearls & Eyes of Ender ─────────────────────────────────
@@ -5157,7 +5188,7 @@ class ThrownItem {
       }
     } else {
       this.vy -= 18 * dt;
-      const sp = Math.hypot(this.vx, this.vy, this.vz), step = sp * dt;
+      const sp = Math.hypot(this.vx, this.vy, this.vz) || 1e-6, step = sp * dt;
       const dx = this.vx / sp, dy = this.vy / sp, dz = this.vz / sp;
       const hit = raycast(world, this.x, this.y, this.z, dx, dy, dz, step);
       let mobHit = null;
@@ -5180,7 +5211,7 @@ class ThrownItem {
     this.mesh.position.set(this.x, this.y, this.z);
     this.mesh.rotation.y += dt * 4;
   }
-  remove() { this.dead = true; Renderer.entityGroup.remove(this.mesh); }
+  remove() { this.dead = true; Renderer.entityGroup.remove(this.mesh); disposeTree(this.mesh); }
 }
 
 class PrimedTNT extends Entity {
@@ -5205,7 +5236,7 @@ class PrimedTNT extends Entity {
     if (Math.random() < 0.5) Renderer.emit(this.x, this.y + 1.1, this.z, 1, [0.5, 0.5, 0.5], 0.1, 0.5, -1, 0.6);
     if (this.fuse <= 0) { this.remove(); Explosion.explode(world, this.x, this.y + 0.5, this.z, 4, this); }
   }
-  remove() { this.dead = true; Renderer.entityGroup.remove(this.mesh); }
+  remove() { this.dead = true; Renderer.entityGroup.remove(this.mesh); disposeTree(this.mesh); }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -5887,7 +5918,7 @@ const Sound = {
     const p = Game.player;
     let vol = SETTINGS.volume;
     if (p && x !== undefined) { const d = Math.hypot(p.x - x, p.y - y, p.z - z); vol *= Math.max(0, 1 - d / 28); }
-    if (vol < 0.01) return;
+    if (!(vol >= 0.01)) return; // also rejects NaN
     this.master.gain.value = 1;
     const M = this.MAT[mat] || this.MAT.stone;
     switch (name) {
@@ -7027,6 +7058,7 @@ const Game = {
     const hd = ITEMS[p.held.id];
     if (hd.placeOn && !hd.placeOn.some((n) => B[n] === below)) return;
     if (placeId === B.oak_door) {
+      if (y + 1 >= HEIGHT) return;
       if (w.getBlock(x, y + 1, z) !== 0 && !REPLACEABLE[w.getBlock(x, y + 1, z)]) return;
       if (!SOLID[below]) return;
       meta = look;
