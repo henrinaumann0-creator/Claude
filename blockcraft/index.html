@@ -682,7 +682,7 @@ defItem('glowstone_dust');
 defItem('red_dye'); defItem('yellow_dye'); defItem('blue_dye'); defItem('green_dye'); defItem('black_dye');
 defItem('oak_door_item', { tex: 'oak_door', display: 'Oak Door', places: 'oak_door' });
 defItem('repeater_item', { tex: 'repeater', display: 'Redstone Repeater', places: 'repeater' });
-defItem('ender_pearl', { stack: 16 }); // STUB: throwing/teleport not implemented.
+defItem('ender_pearl', { stack: 16, use: 'pearl' });
 defItem('ender_eye', { stack: 64, use: 'endportal' });
 defItem('egg', { stack: 16 });
 
@@ -2060,9 +2060,9 @@ for (const d of BLOCKS) {
 }
 
 /** Biome ids and display data. */
-const BIOME = { OCEAN: 0, PLAINS: 1, FOREST: 2, DESERT: 3, MOUNTAINS: 4, SNOWY: 5, BEACH: 6, NETHER: 7, RIVER: 8 };
-const BIOME_NAMES = ['Ocean', 'Plains', 'Forest', 'Desert', 'Mountains', 'Snowy Taiga', 'Beach', 'Nether Wastes', 'River'];
-const BIOME_PRECIP = ['rain', 'rain', 'rain', 'none', 'snow', 'snow', 'rain', 'none', 'rain'];
+const BIOME = { OCEAN: 0, PLAINS: 1, FOREST: 2, DESERT: 3, MOUNTAINS: 4, SNOWY: 5, BEACH: 6, NETHER: 7, RIVER: 8, END: 9 };
+const BIOME_NAMES = ['Ocean', 'Plains', 'Forest', 'Desert', 'Mountains', 'Snowy Taiga', 'Beach', 'Nether Wastes', 'River', 'The End'];
+const BIOME_PRECIP = ['rain', 'rain', 'rain', 'none', 'snow', 'snow', 'rain', 'none', 'rain', 'none'];
 
 class Chunk {
   constructor(cx, cz) {
@@ -2429,7 +2429,27 @@ class OverworldGen {
       put(ox + 5, by + 1, oz + 1, B.chest, 0);
       ch.pendingTiles.push({ x: x0 + ox + 5, y: by + 1, z: z0 + oz + 1, tile: { type: 'chest', items: lootTable('portal', rng) } });
     }
-    // STUB: mineshafts, strongholds, temples and full villages (roads, multiple buildings).
+    // Stronghold portal room (one per 48×48-chunk region; found with Eyes of Ender).
+    const [sx, sz] = Strongholds.inRegion(this.seed, Math.floor(ch.cx / Strongholds.REGION), Math.floor(ch.cz / Strongholds.REGION));
+    if (sx === ch.cx && sz === ch.cz) {
+      const y0 = Strongholds.Y;
+      for (let dx = 1; dx <= 13; dx++) for (let dz = 1; dz <= 13; dz++) for (let dy = 0; dy <= 7; dy++) {
+        const wall = dx === 1 || dx === 13 || dz === 1 || dz === 13 || dy === 0 || dy === 7;
+        put(dx, y0 + dy, dz, wall ? (rng() < 0.25 ? B.mossy_stone_bricks : B.stone_bricks) : 0);
+      }
+      // Raised platform with a lava pool under the 3×3 portal, ringed by 12 frames.
+      for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) put(7 + dx, y0 + 1, 7 + dz, Math.abs(dx) <= 1 && Math.abs(dz) <= 1 ? B.lava : B.stone_bricks);
+      for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) {
+        if ((Math.abs(dx) === 2) === (Math.abs(dz) === 2)) continue;
+        put(7 + dx, y0 + 2, 7 + dz, B.end_portal_frame, rng() < 0.1 ? 4 : 0);
+      }
+      for (const [tx, tz, d] of [[2, 7, 0], [12, 7, 1], [7, 2, 4], [7, 12, 5]]) put(tx, y0 + 4, tz, B.torch, d);
+      put(7, y0 + 1, 11, B.spawner);
+      ch.pendingTiles.push({ x: x0 + 7, y: y0 + 1, z: z0 + 11, tile: { type: 'spawner', mob: 'zombie', delay: 200 } });
+      put(3, y0 + 1, 3, B.chest, 0);
+      ch.pendingTiles.push({ x: x0 + 3, y: y0 + 1, z: z0 + 3, tile: { type: 'chest', items: lootTable('dungeon', rng) } });
+    }
+    // STUB: mineshafts, temples, stronghold corridors/libraries and full villages (roads, multiple buildings).
   }
 }
 
@@ -2517,16 +2537,71 @@ class NetherGen {
     ch.state = CH_GENERATED;
   }
 }
-// STUB: The End dimension (end stone islands, obsidian pillars, end portal and
-// the Ender Dragon boss fight) is not implemented. The boss bar DOM element
-// (#bossbar) and a dimension switch hook (Game.switchDimension) are in place.
+/** Stronghold placement: one per REGION×REGION chunks, deterministic from the seed. */
+const Strongholds = {
+  REGION: 48, Y: 18,
+  inRegion(seed, rx, rz) { const h = hash3(rx, 77, rz, seed); return [rx * this.REGION + 4 + (h % 40), rz * this.REGION + 4 + ((h >>> 8) % 40)]; },
+  /** Nearest stronghold portal room centre to world position (x, z). */
+  nearest(seed, x, z) {
+    const rx = Math.floor(Math.floor(x / 16) / this.REGION), rz = Math.floor(Math.floor(z / 16) / this.REGION);
+    let best = null, bd = Infinity;
+    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
+      const [cx, cz] = this.inRegion(seed, rx + dx, rz + dz);
+      const px = cx * 16 + 7.5, pz = cz * 16 + 7.5, d = Math.hypot(px - x, pz - z);
+      if (d < bd) { bd = d; best = [px, this.Y + 2, pz]; }
+    }
+    return best;
+  },
+};
+
+// ─── End generator: central end-stone island, obsidian pillars with crystals
+class EndGen {
+  constructor(seed) {
+    this.seed = seed;
+    this.n = new SimplexNoise(seed + 201);
+    // Ten obsidian pillars in a ring around the island centre.
+    this.pillars = [];
+    for (let i = 0; i < 10; i++) {
+      const a = i / 10 * Math.PI * 2;
+      this.pillars.push({ x: Math.round(Math.cos(a) * 42), z: Math.round(Math.sin(a) * 42), r: 2 + (i % 3), h: 76 + (hash3(i, 3, 7, seed) % 8) * 3, i });
+    }
+  }
+  column(x, z) { return { h: 60, biome: BIOME.END }; }
+  generate(ch) {
+    const x0 = ch.cx * CHUNK, z0 = ch.cz * CHUNK, blocks = ch.blocks;
+    ch.biome.fill(BIOME.END);
+    for (let lz = 0; lz < 16; lz++) for (let lx = 0; lx < 16; lx++) {
+      const wx = x0 + lx, wz = z0 + lz, d = Math.hypot(wx, wz);
+      const n = this.n.fbm2(wx * 0.02, wz * 0.02, 3);
+      const r = 95 + n * 18;
+      if (d >= r) continue;
+      const t = 1 - d / r;
+      const top = 56 + Math.floor(t * 6 + n * 3);
+      const bottom = top - Math.floor(4 + Math.sqrt(t) * 34);
+      for (let y = Math.max(1, bottom); y <= top; y++) blocks[idx(lx, y, lz)] = B.end_stone;
+    }
+    for (const P of this.pillars) {
+      for (let lz = 0; lz < 16; lz++) for (let lx = 0; lx < 16; lx++) {
+        const dx = x0 + lx - P.x, dz = z0 + lz - P.z;
+        if (dx * dx + dz * dz > P.r * P.r + P.r) continue;
+        for (let y = 40; y <= P.h; y++) blocks[idx(lx, y, lz)] = B.obsidian;
+        if (dx === 0 && dz === 0) { blocks[idx(lx, P.h + 1, lz)] = B.bedrock; ch.spawns.push({ type: 'end_crystal', x: P.x + 0.5, y: P.h + 2, z: P.z + 0.5, crystal: P.i }); }
+      }
+    }
+    // STUB: outer End islands, end cities, chorus plants and elytra.
+    ch.pendingTiles = [];
+    ch.state = CH_GENERATED;
+  }
+}
 
 // ─── World ────────────────────────────────────────────────────────────────
 class World {
   constructor(seed, dim = 'overworld') {
     this.seed = seed;
     this.dim = dim;
-    this.gen = dim === 'nether' ? new NetherGen(seed) : new OverworldGen(seed);
+    this.gen = dim === 'nether' ? new NetherGen(seed) : dim === 'end' ? new EndGen(seed) : new OverworldGen(seed);
+    this.dragonKilled = false;       // End only
+    this.crystalsDead = new Set();   // End only: destroyed pillar crystals
     this.hasSky = dim === 'overworld';
     this.chunks = new Map();
     this.edits = new Map();          // chunkKey → Map(cellIdx → id | meta<<8)
@@ -2572,7 +2647,8 @@ class World {
   /** Effective brightness 0..1 at a position (used for entities & spawning). */
   brightness(x, y, z, daylight) {
     const s = this.getSky(x, y, z) * daylight, b = this.getBlockLight(x, y, z);
-    return Math.max(s, b) / 15;
+    // The End and the Nether have no sky light but an ambient glow.
+    return Math.max(s / 15, b / 15, this.dim === 'end' ? 0.6 : this.dim === 'nether' ? 0.3 : 0);
   }
   /** Highest non-air, non-plant block y in a column (or -1). */
   topY(x, z) {
@@ -3496,34 +3572,37 @@ const Renderer = {
     const rd = SETTINGS.renderDistance * 16;
     let near = rd * 0.55, far = rd - 6;
     if (nether) { top.set(0x2a0606); hor.set(0x3a0a0a); fog.set(0x3a0a0a); daylight = 0; near = 8; far = Math.min(far, 80); }
+    const end = world.dim === 'end';
+    if (end) { top.set(0x160c22); hor.set(0x0e0818); fog.set(0x0e0818); daylight = 0; near = 40; far = Math.max(far, 110); }
     if (underFluid === 1) { fog.set(0x1a3a8a).multiplyScalar(0.4 + 0.6 * daylight); near = 1; far = 22; }
     else if (underFluid === 2) { fog.set(0xd05a10); near = 0.2; far = 2.5; }
     this.skyMat.uniforms.uTop.value.copy(top);
-    this.skyMat.uniforms.uHorizon.value.copy(nether ? hor : fog);
-    this.skyMat.uniforms.uBottom.value.copy(nether ? hor : fog);
+    this.skyMat.uniforms.uHorizon.value.copy(nether || end ? hor : fog);
+    this.skyMat.uniforms.uBottom.value.copy(nether || end ? hor : fog);
     this.skyMat.uniforms.uSunDir.value.copy(sunDir);
-    this.skyMat.uniforms.uGlowAmt.value = nether ? 0 : sunset;
+    this.skyMat.uniforms.uGlowAmt.value = nether || end ? 0 : sunset;
     for (const m of this.mats) {
       const u = m.uniforms;
       u.uDaylight.value = daylight; u.uFogColor.value.copy(fog); u.uFogNear.value = near; u.uFogFar.value = far;
-      u.uAmbient.value = nether ? 0.1 : 0.025;
+      u.uAmbient.value = nether ? 0.1 : end ? 0.3 : 0.025;
     }
     this.gl.setClearColor(fog);
     const p = cam.position;
     this.sky.position.copy(p);
-    this.sunMesh.visible = this.moonMesh.visible = this.stars.visible = this.clouds.visible = !nether;
+    this.sunMesh.visible = this.moonMesh.visible = this.clouds.visible = !nether && !end;
+    this.stars.visible = !nether;
     this.sunMesh.position.copy(p).addScaledVector(sunDir, 300); this.sunMesh.lookAt(p);
     this.moonMesh.position.copy(p).addScaledVector(sunDir, -300); this.moonMesh.lookAt(p);
     this.sunMesh.material.opacity = 1 - weather;
     this.moonMesh.material.opacity = 1 - weather * 0.8;
     this.stars.position.copy(p);
     this.stars.rotation.z = angle;
-    this.stars.material.opacity = (1 - smoothstep(-0.25, 0.05, elev)) * (1 - weather);
+    this.stars.material.opacity = end ? 0.6 : (1 - smoothstep(-0.25, 0.05, elev)) * (1 - weather);
     const cloudY = 150;
     this.clouds.position.set(Math.floor(p.x / 12) * 12, cloudY, Math.floor(p.z / 12) * 12);
     this.cloudTex.offset.set(((this.clouds.position.x + time * 0.03) / 768) % 1, (-this.clouds.position.z / 768) % 1);
     this.clouds.material.color.setScalar(0.25 + 0.75 * daylight);
-    this.ambient.intensity = nether ? 0.6 : 0.35 + 0.4 * daylight;
+    this.ambient.intensity = nether || end ? 0.6 : 0.35 + 0.4 * daylight;
     this.sunLight.intensity = nether ? 0.2 : 0.15 + 0.35 * daylight;
     this.daylight = daylight;
     return daylight;
@@ -4160,6 +4239,14 @@ class Player extends Entity {
       if (this.sprinting && this.onGround) this.addExhaustion(0.1 * Math.hypot(this.vx, this.vz) * dt);
       void oy;
     }
+    // End portals teleport instantly (checked every physics step: the portal
+    // surface is thin and a falling player would otherwise slip past it).
+    if (this.portalCooldown <= 0) {
+      const fx = Math.floor(this.x), fz = Math.floor(this.z);
+      if (world.getBlock(fx, Math.floor(this.y + 0.1), fz) === B.end_portal || world.getBlock(fx, Math.floor(this.y + 0.9), fz) === B.end_portal) {
+        this.portalCooldown = 3; Portals.travelEnd(this); return;
+      }
+    }
     this.camOffset *= Math.pow(0.0001, dt);
     if (Math.abs(this.camOffset) < 0.001) this.camOffset = 0;
     const hs = Math.hypot(this.vx, this.vz);
@@ -4226,6 +4313,7 @@ class Player extends Entity {
         if (this.portalTime >= (this.creative ? 0.5 : 4)) { this.portalTime = 0; this.portalCooldown = 5; Portals.travel(this); }
       }
     } else { this.portalTime = 0; this.portalCooldown = Math.max(0, this.portalCooldown - T); }
+
   }
 }
 
@@ -4293,6 +4381,11 @@ const FACE_DRAW = {
   skeleton: (p) => { for (const [x, y] of [[1, 3], [2, 3], [5, 3], [6, 3], [3, 5], [4, 5]]) p.set(x, y, [30, 30, 30]); for (let x = 1; x < 7; x++) p.set(x, 6, [60, 60, 60]); },
   creeper: (p) => { for (const [x, y] of [[1, 2], [2, 2], [1, 3], [2, 3], [5, 2], [6, 2], [5, 3], [6, 3], [3, 4], [4, 4], [2, 5], [3, 5], [4, 5], [5, 5], [2, 6], [5, 6]]) p.set(x, y, [10, 20, 10]); },
   spider: (p) => { for (const [x, y] of [[1, 3], [2, 3], [5, 3], [6, 3], [2, 2], [5, 2]]) p.set(x, y, [230, 20, 20]); },
+  enderman: (p) => { for (const [x, y] of [[0, 4], [1, 4], [2, 4], [5, 4], [6, 4], [7, 4]]) p.set(x, y, x === 1 || x === 6 ? [224, 121, 250] : [204, 0, 250]); },
+  piglin: (p) => { p.set(1, 3, [255, 255, 255]); p.set(2, 3, [20, 20, 20]); p.set(6, 3, [20, 20, 20]); p.set(5, 3, [120, 180, 90]); for (let x = 2; x < 6; x++) p.set(x, 5, [200, 120, 130]); p.set(1, 6, [240, 240, 220]); p.set(6, 6, [240, 240, 220]); },
+  ghast: (p) => { for (const x of [1, 2, 5, 6]) p.set(x, 3, [60, 60, 60]); for (let x = 3; x < 5; x++) { p.set(x, 5, [60, 60, 60]); p.set(x, 6, [60, 60, 60]); } },
+  blaze: (p) => { for (const x of [1, 2, 5, 6]) p.set(x, 3, [20, 20, 20]); for (let x = 2; x < 6; x++) p.set(x, 6, [120, 60, 0]); },
+  dragon: (p) => { for (const [x, y] of [[1, 3], [2, 3], [5, 3], [6, 3]]) p.set(x, y, [230, 120, 250]); },
   villager: (p) => { p.set(1, 3, [255, 255, 255]); p.set(2, 3, [40, 120, 40]); p.set(6, 3, [255, 255, 255]); p.set(5, 3, [40, 120, 40]); for (let x = 1; x < 7; x++) p.set(x, 2, [90, 60, 40]); },
 };
 /** Build a box part. faceKey adds a face texture to the +Z side. */
@@ -4363,6 +4456,70 @@ const MOB_MODELS = {
   },
 };
 
+Object.assign(MOB_MODELS, {
+  ghast() {
+    const g = new THREE.Group(), legs = [];
+    const body = mobPart(4, 4, 4, 'ghast_body', '#eeeeee', 'ghast', '#eeeeee'); body.position.y = 2.6; g.add(body);
+    for (let i = 0; i < 9; i++) {
+      const l = mobLimb(0.3, 1 + (i % 3) * 0.4, 0.3, 'ghast_leg', '#dddddd', ((i % 3) - 1) * 1.2, 0.65, (Math.floor(i / 3) - 1) * 1.2);
+      legs.push(l); g.add(l);
+    }
+    return { group: g, head: new THREE.Group(), legs, arms: [], body };
+  },
+  blaze() {
+    const g = new THREE.Group();
+    const head = mobPart(0.5, 0.5, 0.5, 'blaze_head', '#f0c020', 'blaze', '#f0c020'); head.position.y = 1.55; g.add(head);
+    const rods = new THREE.Group(); rods.position.y = 0.9; g.add(rods);
+    for (let i = 0; i < 12; i++) {
+      const r = mobPart(0.12, 0.6, 0.12, 'blaze_rod', '#ffb020');
+      const ring = Math.floor(i / 4), a = (i % 4) / 4 * Math.PI * 2 + ring * 0.4, rad = 0.45 + ring * 0.12;
+      r.position.set(Math.cos(a) * rad, 0.45 - ring * 0.4, Math.sin(a) * rad);
+      rods.add(r);
+    }
+    return { group: g, head, legs: [], arms: [], body: head, rods };
+  },
+  enderman() {
+    const g = new THREE.Group(), legs = [], arms = [];
+    const c = '#161616';
+    const body = mobPart(0.5, 0.75, 0.25, 'enderman_body', c); body.position.y = 1.5 + 0.375 + 0.2; g.add(body);
+    const head = mobPart(0.5, 0.5, 0.5, 'enderman_head', c, 'enderman', c);
+    const hp = new THREE.Group(); hp.position.y = 2.45; head.position.y = 0.25; hp.add(head); g.add(hp);
+    for (const s of [-1, 1]) {
+      const l = mobLimb(0.12, 1.7, 0.12, 'enderman_leg', c, s * 0.12, 1.7, 0); legs.push(l); g.add(l);
+      const a = mobLimb(0.12, 1.6, 0.12, 'enderman_arm', c, s * 0.31, 2.4, 0); arms.push(a); g.add(a);
+    }
+    return { group: g, head: hp, legs, arms, body };
+  },
+  crystal() {
+    const g = new THREE.Group();
+    const inner = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), new THREE.MeshLambertMaterial({ color: 0xff70d0, emissive: 0x802060 }));
+    const outer = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.1, 1.1), new THREE.MeshLambertMaterial({ color: 0xd0a0ff, transparent: true, opacity: 0.35, wireframe: true }));
+    inner.position.y = outer.position.y = 1;
+    const base = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.3, 1.4), new THREE.MeshLambertMaterial({ color: 0x404040 }));
+    base.position.y = 0.15;
+    g.add(inner, outer, base);
+    return { group: g, head: new THREE.Group(), legs: [], arms: [], body: inner, spin: [inner, outer] };
+  },
+  dragon() {
+    const g = new THREE.Group();
+    const c = '#1a1a1a';
+    const body = mobPart(2.2, 1.6, 5, 'dragon_body', c); body.position.set(0, 1.5, 0); g.add(body);
+    const neck = mobPart(0.9, 0.9, 2.4, 'dragon_body', c); neck.position.set(0, 1.9, 3.4); g.add(neck);
+    const head = mobPart(1.4, 1.1, 2, 'dragon_head', c, 'dragon', c); head.position.set(0, 2.1, 5.3); g.add(head);
+    const tail = [];
+    for (let i = 0; i < 5; i++) { const t = mobPart(0.8 - i * 0.1, 0.8 - i * 0.1, 1.4, 'dragon_body', c); t.position.set(0, 1.6, -3.1 - i * 1.35); g.add(t); tail.push(t); }
+    const wings = [];
+    for (const sgn of [-1, 1]) {
+      const w = new THREE.Group(); w.position.set(sgn * 1.1, 2.1, 0.8);
+      const bone = mobPart(4.5, 0.25, 0.4, 'dragon_body', c); bone.position.x = sgn * 2.25; w.add(bone);
+      const mem = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.06, 3.2), new THREE.MeshLambertMaterial({ color: 0x3a2a4a }));
+      mem.position.set(sgn * 2.25, 0, -1.6); w.add(mem);
+      g.add(w); wings.push(w);
+    }
+    return { group: g, head: new THREE.Group(), legs: [], arms: [], body, wings, tail };
+  },
+});
+
 /** Mob type definitions (stats, drops, AI flags, model). */
 const MOB_TYPES = {
   pig: { hp: 10, w: 0.9, h: 0.9, speed: 1.9, drops: [['porkchop', 1, 3]], food: 'wheat', model: () => MOB_MODELS.quad({ key: 'pig', color: '#f0a0a0', body: [0.62, 0.5, 0.95], bodyY: 0.6, head: [0.5, 0.5, 0.5], headY: 0.7, headZ: 0.42, leg: [0.22, 0.35, 0.22], legX: 0.18, legZ: 0.3 }), sound: 'oink' },
@@ -4373,6 +4530,12 @@ const MOB_TYPES = {
   skeleton: { hp: 20, w: 0.6, h: 1.95, speed: 2.4, hostile: true, ranged: true, burns: true, drops: [['bone', 0, 2], ['arrow', 0, 2]], xp: 5, model: () => MOB_MODELS.humanoid({ key: 'skeleton', skin: '#c8c8c8', shirt: '#b8b8b8', pants: '#a8a8a8', arms: '#c0c0c0', limb: 0.13, armsForward: true }), sound: 'rattle' },
   creeper: { hp: 20, w: 0.6, h: 1.6, speed: 2.2, hostile: true, explode: true, drops: [['gunpowder', 0, 2]], xp: 5, model: () => MOB_MODELS.creeper(), sound: 'hiss' },
   spider: { hp: 16, w: 1.3, h: 0.9, speed: 3.0, hostile: true, damage: 2, climbs: true, neutralDay: true, drops: [['string', 0, 2], ['spider_eye', 0, 1]], xp: 5, model: () => MOB_MODELS.spider(), sound: 'hiss' },
+  zombified_piglin: { hp: 20, w: 0.6, h: 1.95, speed: 2.6, hostile: true, neutral: true, damage: 5, fireImmune: true, sword: true, drops: [['rotten_flesh', 0, 1], ['gold_nugget', 0, 1]], xp: 5, model: () => MOB_MODELS.humanoid({ key: 'piglin', skin: '#e8a0a0', shirt: '#7a5a3a', pants: '#4a3a2a' }), sound: 'oink' },
+  enderman: { hp: 40, w: 0.6, h: 2.9, speed: 3.6, hostile: true, neutral: true, damage: 7, drops: [['ender_pearl', 0, 1]], xp: 5, model: () => MOB_MODELS.enderman(), sound: 'ender' },
+  ghast: { hp: 10, w: 4, h: 4, speed: 2.2, hostile: true, fly: true, range: 48, fireRate: 3.5, fireImmune: true, drops: [['ghast_tear', 0, 1], ['gunpowder', 0, 2]], xp: 5, model: () => MOB_MODELS.ghast(), sound: 'ghast' },
+  blaze: { hp: 20, w: 0.6, h: 1.8, speed: 2.4, hostile: true, fly: true, range: 20, fireRate: 4, small: true, fireImmune: true, drops: [['blaze_rod', 0, 1]], xp: 10, model: () => MOB_MODELS.blaze(), sound: 'blaze' },
+  end_crystal: { hp: 1, w: 1.4, h: 2, speed: 0, static: true, crystal: true, drops: [], model: () => MOB_MODELS.crystal(), sound: 'glass' },
+  ender_dragon: { hp: 200, w: 5, h: 3, speed: 14, hostile: true, boss: true, fireImmune: true, drops: [], model: () => MOB_MODELS.dragon(), sound: 'dragon' },
   villager: { hp: 20, w: 0.6, h: 1.95, speed: 1.4, trader: true, drops: [], model: () => MOB_MODELS.humanoid({ key: 'villager', skin: '#c8906a', shirt: '#6a4a2a', pants: '#5a3a1a', arms: '#6a4a2a' }), sound: 'hmm' },
 };
 
@@ -4404,6 +4567,11 @@ class Mob extends Entity {
     if (type === 'sheep') this.applyWool();
     this.hpBar = null; this.hpBarTime = 0;
     this.age = 0; this.love = 0; this.breedCd = 0; this.baseScale = 1;
+    if (T.sword) {
+      const sw = Renderer.itemMesh(I.golden_sword, 0.5);
+      sw.position.set(0, -0.65, 0.2); sw.rotation.set(0, Math.PI / 2, -0.6);
+      this.model.arms[1].add(sw);
+    }
     if (T.ranged) {
       const bow = Renderer.itemMesh(I.bow, 0.5);
       bow.position.set(0, -0.6, 0.15); bow.rotation.set(0, Math.PI / 2, 0);
@@ -4422,7 +4590,15 @@ class Mob extends Entity {
   }
   hurt(amount, source, from) {
     if (this.dead || this.deathTime >= 0 || this.invul > 0) return false;
-    this.health -= amount; this.invul = 0.5; this.hurtTime = 0.35; this.hpBarTime = 4;
+    if (this.T.fireImmune && (source === 'fire' || source === 'lava')) return false;
+    if (this.type === 'enderman' && source === 'arrow_player') { this.teleportRandom(Game.world); return false; }
+    this.health -= amount;
+    if (this.T.neutral && source === 'player') {
+      // Neutral mobs retaliate; zombified piglins call their friends.
+      this.angry = true;
+      if (this.type === 'zombified_piglin') for (const e of Game.entities) if (e instanceof Mob && e.type === this.type && this.distTo(e) < 20) e.angry = true;
+    }
+    if (this.type === 'enderman' && this.health > 0 && Math.random() < 0.5) setTimeout(() => this.teleportRandom(Game.world), 0); this.invul = 0.5; this.hurtTime = 0.35; this.hpBarTime = 4;
     this.updateHpBar();
     if (from) {
       const dx = this.x - from.x, dz = this.z - from.z, l = Math.hypot(dx, dz) || 1;
@@ -4437,6 +4613,12 @@ class Mob extends Entity {
   }
   die(source) {
     this.deathTime = 0;
+    if (this.T.crystal) {
+      Game.world.crystalsDead.add(this.crystalId);
+      this.remove();
+      Explosion.explode(Game.world, this.x, this.y + 1, this.z, 3, this);
+      return;
+    }
     Sound.play('death', this.x, this.y, this.z);
     const rng = Math.random;
     const burning = this.fire > 0;
@@ -4473,6 +4655,73 @@ class Mob extends Entity {
     if (this.hpBar) Renderer.entityGroup.remove(this.hpBar);
   }
   distTo(e) { return Math.hypot(e.x - this.x, (e.y) - this.y, e.z - this.z); }
+  /** Enderman-style random teleport to a standable spot within 16 blocks. (STUB: endermen don't carry blocks.) */
+  teleportRandom(world) {
+    for (let i = 0; i < 24; i++) {
+      const x = Math.floor(this.x + (Math.random() - 0.5) * 32), z = Math.floor(this.z + (Math.random() - 0.5) * 32);
+      for (let y = Math.floor(this.y) + 8; y > Math.floor(this.y) - 8; y--) {
+        if (!Path.standable(world, x, y, z) || FLUID[world.getBlock(x, y, z)] || Path.blocked(world, x, y + 2, z)) continue;
+        Renderer.emit(this.x, this.y + 1.4, this.z, 20, [0.7, 0.2, 0.9], 1.2, 1, 0, 0.8);
+        this.x = x + 0.5; this.y = y; this.z = z + 0.5; this.vx = this.vy = this.vz = 0; this.path = null; this.goal = null;
+        Renderer.emit(this.x, this.y + 1.4, this.z, 20, [0.7, 0.2, 0.9], 1.2, 1, 0, 0.8);
+        Sound.play('ender', this.x, this.y, this.z);
+        return true;
+      }
+    }
+    return false;
+  }
+  /** Flying mobs (ghast, blaze): wander in 3D, keep distance and shoot fireballs. */
+  thinkFlying(world, player, daylight) {
+    const T = this.T, d = this.distTo(player);
+    const survival = !player.creative && !player.dead;
+    if (!this.flyGoal || this.aiTimer <= 0) {
+      this.aiTimer = 3 + Math.random() * 4;
+      const a = Math.random() * Math.PI * 2, r = 4 + Math.random() * 10;
+      this.flyGoal = [this.x + Math.cos(a) * r, clamp(this.y + (Math.random() - 0.5) * 6, 36, 110), this.z + Math.sin(a) * r];
+    }
+    if (survival && d < T.range && this.canSee(world, player)) {
+      this.lookAt(player);
+      if (T.small && (d > 10 || d < 5)) { const a = Math.atan2(this.x - player.x, this.z - player.z); this.flyGoal = [player.x + Math.sin(a) * 7, player.y + 2.5, player.z + Math.cos(a) * 7]; }
+      if (this.attackCd <= 0) {
+        this.attackCd = T.fireRate + Math.random();
+        const shots = T.small ? 3 : 1;
+        for (let i = 0; i < shots; i++) setTimeout(() => { if (!this.dead && this.deathTime < 0) this.shootFireball(player); }, i * 300);
+      }
+    }
+    this.fire = 0;
+    this.invul = Math.max(0, this.invul - TICK);
+    if (Math.random() < 0.004) Sound.play(T.sound, this.x, this.y, this.z);
+  }
+  shootFireball(p) {
+    const ox = this.x, oy = this.y + this.h * 0.6, oz = this.z;
+    const dx = p.x - ox, dy = p.y + 1 - oy, dz = p.z - oz, l = Math.hypot(dx, dy, dz) || 1;
+    const sp = this.T.small ? 16 : 11, spread = this.T.small ? 0.12 : 0.02;
+    const s = this.w / 2 + 0.6;
+    Game.entities.push(new Fireball(ox + dx / l * s, oy + dy / l * s, oz + dz / l * s, (dx / l + (Math.random() - 0.5) * spread) * sp, (dy / l) * sp, (dz / l + (Math.random() - 0.5) * spread) * sp, 'mob', !this.T.small));
+    Sound.play(this.T.small ? 'blaze' : 'ghast', this.x, this.y, this.z);
+  }
+  /** Flying movement (no gravity, 3D steering). */
+  updateFlying(dt, world) {
+    const g = this.flyGoal;
+    let tvx = 0, tvy = 0, tvz = 0;
+    if (g) {
+      const dx = g[0] - this.x, dy = g[1] - this.y, dz = g[2] - this.z, l = Math.hypot(dx, dy, dz);
+      if (l > 0.6) { tvx = dx / l * this.T.speed; tvy = dy / l * this.T.speed; tvz = dz / l * this.T.speed; if (!this.T.small) this.targetYaw = Math.atan2(dx, dz); }
+      else this.flyGoal = null;
+    }
+    const k = this.knockTime > 0 ? 0.02 : 1 - Math.exp(-2.5 * dt);
+    this.knockTime -= dt;
+    this.vx += (tvx - this.vx) * k; this.vy += (tvy - this.vy) * k; this.vz += (tvz - this.vz) * k;
+    this.senseFluids(world);
+    const wasY = this.vy;
+    Physics.move(world, this, this.vx * dt, this.vy * dt, this.vz * dt);
+    if (this.hitH || (wasY !== 0 && this.vy === 0)) this.flyGoal = null;
+    this.walk += dt * 3;
+    this.model.legs.forEach((l, i) => (l.rotation.x = Math.sin(this.walk + i) * 0.25));
+    if (this.model.rods) this.model.rods.rotation.y += dt * 2.5;
+    if (this.T.small && Math.random() < 0.2) Renderer.emit(this.x, this.y + 0.6, this.z, 1, [1, 0.6, 0.1], 0.6, 0.5, -2, 0.5);
+    this.visuals(dt, world, 1);
+  }
   /** Can this mob see the player (simple ray march)? */
   canSee(world, p) {
     const ox = this.x, oy = this.y + this.h * 0.85, oz = this.z;
@@ -4484,10 +4733,22 @@ class Mob extends Entity {
   think(world, player, daylight) {
     const T = this.T;
     this.aiTimer -= TICK; this.pathTimer -= TICK; this.attackCd -= TICK; this.panic -= TICK;
+    if (T.static) return;
+    if (T.fly) { this.thinkFlying(world, player, daylight); return; }
     const d = this.distTo(player);
     const survival = !player.creative && !player.dead;
+    if (this.type === 'enderman') {
+      // Looking an enderman in the eyes makes it hostile; water and rain make it teleport.
+      if (!this.angry && survival && d < 32) {
+        const [lx, ly, lz] = Input.lookDir();
+        const ex = this.x - player.x, ey = this.y + 2.6 - (player.y + player.eye), ez = this.z - player.z, el = Math.hypot(ex, ey, ez) || 1;
+        if ((lx * ex + ly * ey + lz * ez) / el > 0.985 && this.canSee(world, player)) { this.angry = true; Sound.play('ender', this.x, this.y, this.z); }
+      }
+      if (this.inWater || (Game.weather.raining && world.hasSky && world.getSky(Math.floor(this.x), Math.floor(this.y + 2), Math.floor(this.z)) >= 15)) { if (this.teleportRandom(world)) this.health -= this.inWater ? 1 : 0; }
+      if (this.angry && d > 6 && Math.random() < 0.01) this.teleportRandom(world);
+    }
     let target = null;
-    if (T.hostile && survival && d < 24) {
+    if (T.hostile && survival && d < (T.neutral ? 40 : 24) && (!T.neutral || this.angry)) {
       const dayNeutral = T.neutralDay && daylight > 0.6 && world.getSky(Math.floor(this.x), Math.floor(this.y + 1), Math.floor(this.z)) > 10 && !this.angry;
       if (!dayNeutral) target = player;
     }
@@ -4574,7 +4835,7 @@ class Mob extends Entity {
     // Burning in daylight.
     if (T.burns && world.hasSky && daylight > 0.75 && !this.inWater && !Game.weather.raining && world.getSky(Math.floor(this.x), Math.floor(this.y + this.h), Math.floor(this.z)) === 15) this.fire = Math.max(this.fire, 3);
     if (this.inLava) this.fire = 8;
-    if (this.inWater) this.fire = 0;
+    if (this.inWater || T.fireImmune) this.fire = 0;
     if (this.fire > 0) {
       this.fire -= TICK; this.fireTick = (this.fireTick || 0) + TICK;
       if (this.fireTick >= 1) { this.fireTick = 0; this.hurt(this.inLava ? 4 : 1, 'fire'); }
@@ -4602,6 +4863,14 @@ class Mob extends Entity {
       this.mesh.position.set(this.x, this.y, this.z);
       return;
     }
+    if (this.T.static) {
+      // End crystals: spin in place.
+      this.walk += dt;
+      for (const m of this.model.spin) { m.rotation.x += dt * 1.3; m.rotation.y += dt * 1.7; m.position.y = 1 + Math.sin(this.walk * 2) * 0.25; }
+      this.mesh.position.set(this.x, this.y, this.z);
+      return;
+    }
+    if (this.T.fly) { this.updateFlying(dt, world); return; }
     // Steering towards path waypoints / goal.
     let gx = null, gz = null, wantJump = false;
     if (this.path && this.path.length) {
@@ -4636,6 +4905,10 @@ class Mob extends Entity {
     if (this.inWater && this.y < Math.floor(this.y) + 0.8) this.vy += 22 * dt;
     if (this.type === 'chicken' && !this.onGround && this.vy < -2) this.vy = -2;
     this.physics(dt, world);
+    this.visuals(dt, world);
+  }
+  /** Turning, limb animation, lighting, hurt flash and health bar (shared by all mobs). */
+  visuals(dt, world, minLight = 0) {
     // Turn smoothly.
     let dyaw = this.targetYaw - this.yaw;
     while (dyaw > Math.PI) dyaw -= Math.PI * 2;
@@ -4657,7 +4930,7 @@ class Mob extends Entity {
     this.mesh.scale.setScalar(fs * this.baseScale);
     // Lighting & hurt flash.
     const b = world.brightness(Math.floor(this.x), Math.floor(this.y + this.h * 0.7), Math.floor(this.z), Renderer.daylight || 1);
-    const lb = 0.18 + 0.82 * b;
+    const lb = Math.max(minLight, 0.18 + 0.82 * b);
     const flash = this.hurtTime > 0 || (this.fuse > 0 && Math.floor(this.fuse * 8) % 2);
     for (const m of this.mats) { m.color.setScalar(lb); if (m.emissive) m.emissive.setRGB(flash ? (this.fuse > 0 ? 0.6 : 0.5) : 0, flash && this.fuse > 0 ? 0.6 : 0, flash && this.fuse > 0 ? 0.6 : 0); }
     this.hurtTime = Math.max(0, this.hurtTime - dt);
@@ -4702,7 +4975,7 @@ class Arrow {
       const r = rayBox(this.x, this.y, this.z, dx, dy, dz, [bb[0] - 0.1, bb[1] - 0.1, bb[2] - 0.1, bb[3] + 0.1, bb[4] + 0.1, bb[5] + 0.1]);
       if (r && r.t <= step) {
         const dmg = Math.ceil(sp / 22 * 4 * this.power);
-        e.hurt(dmg, this.owner === 'player' ? 'player' : 'arrow', { x: this.x - dx, z: this.z - dz, knockback: 3 });
+        e.hurt(dmg, this.owner === 'player' ? (e.type === 'enderman' ? 'arrow_player' : 'player') : 'arrow', { x: this.x - dx, z: this.z - dz, knockback: 3 });
         this.remove(); return;
       }
     }
@@ -4721,6 +4994,195 @@ class Arrow {
 }
 
 // ─── Primed TNT ───────────────────────────────────────────────────────────
+// ─── Ender Dragon (boss) ──────────────────────────────────────────────────
+// Circles the island, periodically dives at the player, heals from End
+// crystals (beam), deals contact damage; on death it builds the exit portal.
+// STUB: perching on the exit portal, dragon breath/fireballs and block breaking.
+class EnderDragon extends Mob {
+  constructor(x, y, z) {
+    super('ender_dragon', x, y, z);
+    this.state = 'circle'; this.angle = 0; this.stateTime = 0; this.contactCd = 0; this.healCd = 0;
+    this.beam = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: 0xff80ff }));
+    this.beam.visible = false; this.beam.frustumCulled = false;
+    Renderer.entityGroup.add(this.beam);
+    this.target = [0, 80, 0];
+  }
+  think(world, player) {
+    if (this.deathTime >= 0) return;
+    this.stateTime += TICK; this.contactCd -= TICK; this.healCd -= TICK;
+    this.invul = Math.max(0, this.invul - TICK);
+    const survival = !player.creative && !player.dead;
+    if (this.state === 'circle') {
+      this.angle += TICK * 0.35;
+      this.target = [Math.cos(this.angle) * 45, 78 + Math.sin(this.angle * 3) * 6, Math.sin(this.angle) * 45];
+      if (survival && this.stateTime > 10 + Math.random() * 8 && Math.hypot(player.x, player.z) < 120) { this.state = 'dive'; this.stateTime = 0; Sound.play('dragon', this.x, this.y, this.z); }
+    } else if (this.state === 'dive') {
+      this.target = [player.x, player.y + 1, player.z];
+      if (this.stateTime > 5 || Math.hypot(player.x - this.x, player.y - this.y, player.z - this.z) < 3) { this.state = 'climb'; this.stateTime = 0; }
+    } else if (this.state === 'climb') {
+      this.target = [this.x + Math.sin(this.yaw) * 20, 95, this.z + Math.cos(this.yaw) * 20];
+      if (this.stateTime > 3) { this.state = 'circle'; this.stateTime = 0; this.angle = Math.atan2(this.z, this.x); }
+    }
+    // Contact damage + knockback.
+    if (survival && this.contactCd <= 0 && Math.hypot(player.x - this.x, player.y + 1 - (this.y + 1.5), player.z - this.z) < 4.5) {
+      this.contactCd = 1; player.hurt(8, 'dragon', this); player.vy = 10;
+    }
+    // Healing from the nearest living End crystal.
+    let crystal = null, cd = 48;
+    for (const e of Game.entities) if (e instanceof Mob && e.T.crystal && !e.dead && e.deathTime < 0) { const d = this.distTo(e); if (d < cd) { cd = d; crystal = e; } }
+    this.healCrystal = crystal;
+    if (crystal && this.healCd <= 0 && this.health < this.maxHealth) { this.healCd = 0.5; this.health = Math.min(this.maxHealth, this.health + 1); }
+  }
+  hurt(amount, source, from) {
+    if (source === 'explosion') amount *= 0.5;
+    const r = super.hurt(amount, source, null);
+    if (r && this.state === 'circle' && Math.random() < 0.3) { this.state = 'climb'; this.stateTime = 0; }
+    return r;
+  }
+  die() {
+    this.deathTime = 0;
+    Sound.play('dragon', this.x, this.y, this.z);
+  }
+  update(dt, world, player) {
+    if (this.deathTime >= 0) {
+      this.deathTime += dt;
+      this.y += dt * 2;
+      Renderer.emit(this.x + (Math.random() - 0.5) * 6, this.y + Math.random() * 3, this.z + (Math.random() - 0.5) * 6, 6, [1, 0.8, 1], 1, 4, -2, 1);
+      this.mesh.position.set(this.x, this.y, this.z);
+      if (this.deathTime > 4) {
+        this.remove();
+        Game.onDragonKilled();
+      }
+      return;
+    }
+    const [tx, ty, tz] = this.target;
+    const dx = tx - this.x, dy = ty - this.y, dz = tz - this.z, l = Math.hypot(dx, dy, dz) || 1;
+    const sp = this.state === 'dive' ? 20 : 14;
+    const k = 1 - Math.exp(-1.6 * dt);
+    this.vx += (dx / l * sp - this.vx) * k; this.vy += (dy / l * sp - this.vy) * k; this.vz += (dz / l * sp - this.vz) * k;
+    this.x += this.vx * dt; this.y += this.vy * dt; this.z += this.vz * dt;
+    this.targetYaw = Math.atan2(this.vx, this.vz);
+    let dyaw = this.targetYaw - this.yaw;
+    while (dyaw > Math.PI) dyaw -= Math.PI * 2;
+    while (dyaw < -Math.PI) dyaw += Math.PI * 2;
+    this.yaw += dyaw * Math.min(1, dt * 3);
+    this.walk += dt * 4;
+    const [wl, wr] = this.model.wings;
+    wl.rotation.z = Math.sin(this.walk) * 0.7; wr.rotation.z = -Math.sin(this.walk) * 0.7;
+    this.model.tail.forEach((t, i) => (t.position.x = Math.sin(this.walk * 0.5 - i * 0.6) * 0.4 * i));
+    this.mesh.position.set(this.x, this.y, this.z);
+    this.mesh.rotation.set(-clamp(this.vy / sp, -0.6, 0.6) * 0.6, this.yaw, 0);
+    for (const m of this.mats) { m.color.setScalar(0.9); if (m.emissive) m.emissive.setRGB(this.hurtTime > 0 ? 0.6 : 0, 0, 0); }
+    this.hurtTime = Math.max(0, this.hurtTime - dt);
+    if (this.hpBar) this.hpBar.visible = false; // the boss bar is used instead
+    const c = this.healCrystal;
+    this.beam.visible = !!c && this.health < this.maxHealth;
+    if (this.beam.visible) { const pos = this.beam.geometry.attributes.position; pos.setXYZ(0, c.x, c.y + 1, c.z); pos.setXYZ(1, this.x, this.y + 1.5, this.z); pos.needsUpdate = true; }
+  }
+  remove() { super.remove(); Renderer.entityGroup.remove(this.beam); }
+}
+
+// ─── Fireballs (ghasts: big & explosive, blazes: small & incendiary) ─────
+class Fireball {
+  constructor(x, y, z, vx, vy, vz, owner, big) {
+    this.x = x; this.y = y; this.z = z; this.vx = vx; this.vy = vy; this.vz = vz; this.owner = owner; this.big = big;
+    this.age = 0; this.dead = false;
+    const sz = big ? 0.9 : 0.35;
+    this.mesh = new THREE.Mesh(new THREE.BoxGeometry(sz, sz, sz), new THREE.MeshBasicMaterial({ color: big ? 0xff7a1a : 0xffb020 }));
+    Renderer.entityGroup.add(this.mesh);
+    this.r = sz / 2;
+  }
+  /** Punching a ghast fireball sends it back. */
+  deflect(dir) { const sp = Math.hypot(this.vx, this.vy, this.vz); this.vx = dir[0] * sp; this.vy = dir[1] * sp; this.vz = dir[2] * sp; this.owner = 'player'; }
+  update(dt, world, player) {
+    this.age += dt;
+    if (this.age > 12) { this.remove(); return; }
+    const sp = Math.hypot(this.vx, this.vy, this.vz), step = sp * dt;
+    const dx = this.vx / sp, dy = this.vy / sp, dz = this.vz / sp;
+    const targets = this.owner === 'player' ? Game.entities.filter((e) => e instanceof Mob && e.deathTime < 0) : [player];
+    let hitEnt = null;
+    for (const e of targets) {
+      const bb = e.aabb();
+      const r = rayBox(this.x, this.y, this.z, dx, dy, dz, [bb[0] - this.r, bb[1] - this.r, bb[2] - this.r, bb[3] + this.r, bb[4] + this.r, bb[5] + this.r]);
+      if (r && r.t <= step) { hitEnt = e; break; }
+    }
+    const hit = hitEnt ? null : raycast(world, this.x, this.y, this.z, dx, dy, dz, step);
+    if (hitEnt || (hit && SOLID[hit.id])) {
+      if (hit) { this.x += dx * hit.dist; this.y += dy * hit.dist; this.z += dz * hit.dist; }
+      if (this.big) {
+        Explosion.explode(world, this.x, this.y, this.z, 1.2, null);
+        for (let i = 0; i < 6; i++) {
+          const fx = Math.floor(this.x + (Math.random() - 0.5) * 4), fy = Math.floor(this.y + (Math.random() - 0.5) * 2), fz = Math.floor(this.z + (Math.random() - 0.5) * 4);
+          if (world.getBlock(fx, fy, fz) === 0 && SOLID[world.getBlock(fx, fy - 1, fz)]) { world.setBlock(fx, fy, fz, B.fire); world.schedule(fx, fy, fz, 30); }
+        }
+      } else {
+        if (hitEnt) { hitEnt.hurt(5, this.owner === 'player' ? 'player' : 'fire', { x: this.x - dx, z: this.z - dz, knockback: 2 }); hitEnt.fire = Math.max(hitEnt.fire || 0, 5); }
+        else if (hit) {
+          const fx = hit.x + DIRS[hit.d][0], fy = hit.y + DIRS[hit.d][1], fz = hit.z + DIRS[hit.d][2];
+          if (world.getBlock(fx, fy, fz) === 0) { world.setBlock(fx, fy, fz, B.fire); world.schedule(fx, fy, fz, 30); Game.remeshNear(fx, fz); }
+        }
+        Renderer.emit(this.x, this.y, this.z, 8, [1, 0.6, 0.1], 0.3, 2, 2, 0.4);
+      }
+      this.remove(); return;
+    }
+    this.x += this.vx * dt; this.y += this.vy * dt; this.z += this.vz * dt;
+    this.mesh.position.set(this.x, this.y, this.z);
+    this.mesh.rotation.x += dt * 5; this.mesh.rotation.y += dt * 4;
+    if (Math.random() < 0.6) Renderer.emit(this.x, this.y, this.z, 1, [0.4, 0.4, 0.4], 0.2, 0.3, -1, 0.6);
+  }
+  remove() { this.dead = true; Renderer.entityGroup.remove(this.mesh); }
+}
+
+// ─── Thrown ender pearls & Eyes of Ender ─────────────────────────────────
+class ThrownItem {
+  constructor(kind, x, y, z, vx, vy, vz, target) {
+    this.kind = kind; this.x = x; this.y = y; this.z = z; this.vx = vx; this.vy = vy; this.vz = vz; this.target = target;
+    this.age = 0; this.dead = false; this.y0 = y;
+    this.mesh = Renderer.itemMesh(kind === 'pearl' ? I.ender_pearl : I.ender_eye, 0.25);
+    Renderer.entityGroup.add(this.mesh);
+  }
+  update(dt, world, player) {
+    this.age += dt;
+    if (this.kind === 'eye') {
+      // Flies towards the nearest stronghold, then hovers and drops (or shatters).
+      if (this.age < 1.6 && this.target) {
+        const dx = this.target[0] - this.x, dz = this.target[2] - this.z, l = Math.hypot(dx, dz) || 1;
+        this.x += dx / l * 9 * dt; this.z += dz / l * 9 * dt; this.y += (this.y0 + 3 - this.y) * dt * 2;
+      }
+      Renderer.emit(this.x, this.y, this.z, 1, [0.6, 0.3, 0.9], 0.2, 0.3, 0, 0.6);
+      if (this.age > 2.4) {
+        if (Math.random() < 0.8) Game.dropItem(this.x, this.y, this.z, mkStack(I.ender_eye, 1), 0, 1, 0);
+        else { Renderer.emit(this.x, this.y, this.z, 16, [0.3, 0.8, 0.5], 0.5, 2, 5, 0.8); Sound.play('break', this.x, this.y, this.z, 'glass'); }
+        this.remove(); return;
+      }
+    } else {
+      this.vy -= 18 * dt;
+      const sp = Math.hypot(this.vx, this.vy, this.vz), step = sp * dt;
+      const dx = this.vx / sp, dy = this.vy / sp, dz = this.vz / sp;
+      const hit = raycast(world, this.x, this.y, this.z, dx, dy, dz, step);
+      let mobHit = null;
+      for (const e of Game.entities) if (e instanceof Mob && e.deathTime < 0) { const r = rayBox(this.x, this.y, this.z, dx, dy, dz, e.aabb()); if (r && r.t <= step) mobHit = e; }
+      if ((hit && SOLID[hit.id]) || mobHit || this.y < -60) {
+        let tx = this.x, ty = this.y, tz = this.z;
+        if (hit && !mobHit) { tx = hit.x + 0.5 + DIRS[hit.d][0] * 0.8; ty = hit.y + (hit.d === 2 ? 1 : DIRS[hit.d][1]); tz = hit.z + 0.5 + DIRS[hit.d][2] * 0.8; }
+        if (mobHit) mobHit.hurt(0.5, 'player', { x: this.x, z: this.z, knockback: 2 });
+        if (this.y > -60 && !player.dead) {
+          Renderer.emit(player.x, player.y + 1, player.z, 16, [0.4, 0.9, 0.8], 0.8, 2, 0, 0.8);
+          player.x = tx; player.y = ty; player.z = tz; player.vx = player.vy = player.vz = 0; player.fallDist = 0;
+          while (player.y < HEIGHT - 2 && Physics.collides(world, player.aabb())) player.y += 1;
+          player.invul = 0; player.hurt(5, 'fall');
+          Sound.play('ender', player.x, player.y, player.z);
+        }
+        this.remove(); return;
+      }
+      this.x += this.vx * dt; this.y += this.vy * dt; this.z += this.vz * dt;
+    }
+    this.mesh.position.set(this.x, this.y, this.z);
+    this.mesh.rotation.y += dt * 4;
+  }
+  remove() { this.dead = true; Renderer.entityGroup.remove(this.mesh); }
+}
+
 class PrimedTNT extends Entity {
   constructor(x, y, z, fuse = 4) {
     super(x + 0.5, y, z + 0.5);
@@ -5278,6 +5740,49 @@ const Portals = {
     for (const [dx, dz] of h) if (!ok(world.getBlock(x + dx, y, z + dz))) return false;
     return ok(world.getBlock(x, y + 1, z)) && ok(world.getBlock(x, y - 1, z));
   },
+  /** Complete end-portal frame ring (12 frames with eyes) → fill the 3×3 centre. */
+  tryActivateEnd(world, x, y, z) {
+    for (let cx = x - 2; cx <= x + 2; cx++) for (let cz = z - 2; cz <= z + 2; cz++) {
+      let ok = true;
+      for (let dx = -2; dx <= 2 && ok; dx++) for (let dz = -2; dz <= 2 && ok; dz++) {
+        if ((Math.abs(dx) === 2) === (Math.abs(dz) === 2)) continue;
+        if (world.getBlock(cx + dx, y, cz + dz) !== B.end_portal_frame || !(world.getMeta(cx + dx, y, cz + dz) & 4)) ok = false;
+      }
+      if (!ok) continue;
+      for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) world.setBlock(cx + dx, y, cz + dz, B.end_portal, 0, { update: false });
+      Sound.play('portal', cx, y, cz);
+      chat('The End portal has opened!', '#c8f');
+      return true;
+    }
+    return false;
+  },
+  /** Overworld → End (onto an obsidian platform) or End → Overworld spawn. */
+  travelEnd(player) {
+    if (Game.world.dim === 'end') {
+      Game.switchDimension('overworld', (w) => {
+        Game.forceLoad(w, player.spawn[0], player.spawn[2], 1);
+        const pos = player.spawn.slice();
+        const tmp = { x: pos[0], y: pos[1], z: pos[2], w: 0.6, h: 1.8, aabb: Entity.prototype.aabb };
+        while (tmp.y < HEIGHT - 2 && Physics.collides(w, tmp.aabb())) tmp.y += 1;
+        return [tmp.x, tmp.y, tmp.z];
+      });
+      if (Game.world.dragonKilledMsg) chat('Thanks for playing!', '#c8f');
+      return;
+    }
+    Game.switchDimension('end', (w) => {
+      // Obsidian arrival platform out in the void, facing the island.
+      const PX = 120;
+      Game.forceLoad(w, PX, 0, 1);
+      for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) {
+        w.setBlock(PX + dx, 48, dz, B.obsidian);
+        for (let dy = 1; dy <= 3; dy++) w.setBlock(PX + dx, 48 + dy, dz, 0);
+      }
+      Game.player.yaw = Math.PI / 2; Game.player.pitch = 0.15;
+      return [PX + 0.5, 49, 0.5];
+    });
+    if (!Game.world.dragonKilled) Game.spawnDragon();
+    chat('Entering The End…', '#c8f');
+  },
   /** Teleport the player to the other dimension, finding or building a portal. */
   travel(player) {
     const from = Game.world;
@@ -5416,6 +5921,10 @@ const Sound = {
       case 'groan': this.tone(120, 80, 0.8, vol * 0.2, 'sawtooth'); break;
       case 'rattle': for (let i = 0; i < 4; i++) this.noise(0.04, 2500, 3, vol * 0.2, 'bandpass', i * 0.07); break;
       case 'hmm': this.tone(220, 180, 0.3, vol * 0.2, 'triangle'); break;
+      case 'ghast': this.tone(700, 420, 0.7, vol * 0.25, 'sine'); this.tone(760, 380, 0.7, vol * 0.2, 'triangle'); break;
+      case 'blaze': this.noise(0.6, 600, 0.6, vol * 0.3, 'lowpass'); break;
+      case 'ender': this.tone(300, 900, 0.35, vol * 0.2, 'sine'); this.tone(900, 250, 0.35, vol * 0.15, 'sine', 0.1); break;
+      case 'dragon': this.tone(90, 45, 1.6, vol * 0.5, 'sawtooth'); this.noise(1.4, 250, 0.5, vol * 0.4, 'lowpass'); break;
     }
   },
   stepAt(world, x, y, z) { this.play('step', x, y, z, this.material(world.getBlock(Math.floor(x), Math.floor(y), Math.floor(z)))); },
@@ -5883,7 +6392,10 @@ const HUD = {
     const cd = Input.attackCooldown();
     $('cooldown').style.display = cd < 1 ? 'block' : 'none';
     $('cooldown').firstChild.style.width = (cd * 100) + '%';
-    $('modeTag').textContent = (Game.mode === 'creative' ? 'CREATIVE' : 'SURVIVAL') + (p.flying ? ' · flying' : '') + (w.dim === 'nether' ? ' · NETHER' : '');
+    const dr = Game.dragon;
+    $('bossbar').classList.toggle('hidden', !dr || dr.dead || Game.world.dim !== 'end');
+    if (dr && !dr.dead) $('bossFill').style.width = clamp(dr.health / dr.maxHealth, 0, 1) * 100 + '%';
+    $('modeTag').textContent = (Game.mode === 'creative' ? 'CREATIVE' : 'SURVIVAL') + (p.flying ? ' · flying' : '') + (w.dim === 'nether' ? ' · NETHER' : w.dim === 'end' ? ' · THE END' : '');
     // Debug (F3).
     const dbg = $('debug');
     dbg.style.display = this.debugOn ? 'block' : 'none';
@@ -6023,6 +6535,13 @@ const Input = {
   onAttackPress() {
     const p = Game.player;
     this.swing = 1;
+    // Punch fireballs back.
+    const [ldx, ldy, ldz] = this.lookDir();
+    for (const e of Game.entities) {
+      if (!(e instanceof Fireball) || e.dead) continue;
+      const r = rayBox(p.x, p.y + p.eye, p.z, ldx, ldy, ldz, [e.x - 0.8, e.y - 0.8, e.z - 0.8, e.x + 0.8, e.y + 0.8, e.z + 0.8]);
+      if (r && r.t < 4.5) { e.deflect([ldx, ldy, ldz]); Sound.play('arrowhit', e.x, e.y, e.z); return; }
+    }
     if (this.targetMob) { Game.attack(this.targetMob); return; }
     if (this.target && p.creative) { Game.playerBreak(this.target.x, this.target.y, this.target.z); this.breakRepeat = 0.25; }
   },
@@ -6124,7 +6643,7 @@ const Persist = {
       for (const [k, m] of w.edits) { const a = []; for (const [i, v] of m) a.push(i, v); edits[k] = a; }
       const tiles = {};
       for (const [k, t] of w.tiles) tiles[k] = t;
-      worlds[dim] = { edits, tiles, struct: [...w.structSpawned] };
+      worlds[dim] = { edits, tiles, struct: [...w.structSpawned], dragonKilled: w.dragonKilled, crystalsDead: [...w.crystalsDead] };
     }
     return {
       v: 1, seed: g.seed, mode: g.mode, time: g.time, totalTicks: g.totalTicks, dim: g.world.dim,
@@ -6142,6 +6661,8 @@ const Persist = {
     }
     for (const k in data.tiles) w.tiles.set(k, data.tiles[k]);
     for (const k of data.struct || []) w.structSpawned.add(k);
+    w.dragonKilled = !!data.dragonKilled;
+    for (const k of data.crystalsDead || []) w.crystalsDead.add(k);
   },
   save(silent) {
     if (!Game.running) return false;
@@ -6209,7 +6730,7 @@ const Game = {
     if (UI.screen && UI.screen.tile === t) UI.close();
   },
   primeTNT(x, y, z, fuse) { this.entities.push(new PrimedTNT(x, y, z, fuse)); },
-  spawnMob(type, x, y, z) { const m = new Mob(type, x, y, z); this.entities.push(m); return m; },
+  spawnMob(type, x, y, z) { const m = type === 'ender_dragon' ? new EnderDragon(x, y, z) : new Mob(type, x, y, z); this.entities.push(m); if (type === 'ender_dragon') this.dragon = m; return m; },
   growTree(world, x, y, z, type) {
     // Check room, then stamp the same tree shapes as the generator.
     for (let i = 1; i < 6; i++) if (world.getBlock(x, y + i, z) !== 0 && !LEAVES[world.getBlock(x, y + i, z)]) return false;
@@ -6381,6 +6902,22 @@ const Game = {
       }
       return;
     }
+    // Ender pearls are thrown; Eyes of Ender fly towards the nearest stronghold
+    // (unless the player is clicking an End portal frame to insert them).
+    if (hd && hd.use === 'pearl' && first) {
+      const [dx, dy, dz] = Input.lookDir();
+      this.entities.push(new ThrownItem('pearl', p.x + dx * 0.4, p.y + p.eye, p.z + dz * 0.4, dx * 24, dy * 24 + 2, dz * 24));
+      p.useHeld(); Sound.play('bow', p.x, p.y, p.z);
+      return;
+    }
+    if (hd && hd.use === 'endportal' && first && !(hit && hit.id === B.end_portal_frame)) {
+      if (w.dim !== 'overworld') { chat('The Eye of Ender does not work here.', '#c9f'); return; }
+      const target = Strongholds.nearest(w.seed, p.x, p.z);
+      const [dx, , dz] = Input.lookDir();
+      this.entities.push(new ThrownItem('eye', p.x + dx * 0.5, p.y + p.eye, p.z + dz * 0.5, 0, 0, 0, target));
+      p.useHeld(); Sound.play('bow', p.x, p.y, p.z);
+      return;
+    }
     // Armor: right-click equips (swapping with what is worn).
     if (hd && hd.armor && first && !interact) {
       const slot = hd.armor.slot, old = p.armor[slot];
@@ -6449,7 +6986,16 @@ const Game = {
       if (used) { p.useHeld(); Renderer.emit(x + 0.5, y + 0.8, z + 0.5, 10, [0.5, 1, 0.4], 0.9, 1, -1, 0.8); this.remeshNear(x, z); }
       return;
     }
-    if (hd.use === 'endportal') { chat('STUB: The End and end portals are not implemented yet.', '#c9f'); return; }
+    if (hd.use === 'endportal') {
+      // Insert an Eye of Ender into an End portal frame.
+      if (id === B.end_portal_frame && !(meta & 4) && first) {
+        w.setMeta(x, y, z, meta | 4);
+        p.useHeld(); Sound.play('portal', x, y, z);
+        Portals.tryActivateEnd(w, x, y, z);
+        this.remeshNear(x, z);
+      }
+      return;
+    }
     // 4. Placement.
     const placeId = hd.isBlock && !hd.noItem ? held.id : (hd.places ? B[hd.places] : 0);
     if (!placeId) return;
@@ -6552,16 +7098,51 @@ const Game = {
     if (this.unloadTimer <= 0) {
       this.unloadTimer = 1000;
       for (const ch of [...w.chunks.values()]) if (Math.hypot(ch.cx - pcx, ch.cz - pcz) > R + 3) w.unloadChunk(ch);
-      for (const e of this.entities) if (e instanceof Mob || e instanceof ItemEntity) { if (!w.isLoaded(Math.floor(e.x), Math.floor(e.z))) e.remove(); }
+      for (const e of this.entities) if ((e instanceof Mob && !(e instanceof EnderDragon)) || e instanceof ItemEntity) { if (!w.isLoaded(Math.floor(e.x), Math.floor(e.z))) e.remove(); }
     }
     return work;
   },
   onChunkReady(w, ch) {
     if (ch.spawns && ch.spawns.length) {
-      for (const s of ch.spawns) this.spawnMob(s.type, s.x, s.y, s.z);
+      let structural = false;
+      for (const s of ch.spawns) {
+        if (s.type === 'end_crystal') {
+          // Crystals respawn with their chunk until destroyed (tracked per world).
+          if (w.crystalsDead.has(s.crystal) || this.entities.some((e) => e.crystalId === s.crystal && !e.dead)) continue;
+          this.spawnMob('end_crystal', s.x, s.y, s.z).crystalId = s.crystal;
+        } else { this.spawnMob(s.type, s.x, s.y, s.z); structural = true; }
+      }
       ch.spawns = [];
-      w.structSpawned.add(chunkKey(ch.cx, ch.cz));
+      if (structural) w.structSpawned.add(chunkKey(ch.cx, ch.cz));
     }
+  },
+  spawnDragon() {
+    if (this.entities.some((e) => e instanceof EnderDragon && !e.dead)) return;
+    this.dragon = new EnderDragon(0, 85, 0);
+    this.entities.push(this.dragon);
+    chat('The Ender Dragon awakens!', '#e8f');
+  },
+  onDragonKilled() {
+    const w = this.world, p = this.player;
+    w.dragonKilled = true; w.dragonKilledMsg = true;
+    this.dragon = null;
+    this.forceLoad(w, 0, 0, 1);
+    let y0 = 0;
+    for (let y = HEIGHT - 2; y > 0; y--) if (w.getBlock(0, y, 0) === B.end_stone) { y0 = y + 1; break; }
+    if (!y0) y0 = 60;
+    // Exit portal: bedrock basin + centre pillar with the dragon egg on top.
+    for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) {
+      const r = Math.hypot(dx, dz);
+      if (r > 3.3) continue;
+      w.setBlock(dx, y0 - 1, dz, B.bedrock);
+      if (r > 2.2) w.setBlock(dx, y0, dz, B.bedrock);
+      else if (dx || dz) w.setBlock(dx, y0, dz, B.end_portal, 0, { update: false });
+    }
+    for (let dy = 0; dy < 4; dy++) w.setBlock(0, y0 + dy, 0, B.bedrock);
+    w.setBlock(0, y0 + 4, 0, B.dragon_egg);
+    this.remeshNear(0, 0);
+    if (!p.dead) p.addXP(p.creative ? 0 : 500);
+    chat('The Ender Dragon has been defeated! Jump into the exit portal to return home.', '#e8f');
   },
   /** Synchronously generate + light chunks around (x,z) (used for teleports). */
   forceLoad(w, x, z, r) {
@@ -6578,13 +7159,37 @@ const Game = {
     for (const e of this.entities) {
       if (!(e instanceof Mob) || e.deathTime >= 0) continue;
       const d = Math.hypot(e.x - p.x, e.z - p.z);
+      if (e.T.boss || e.T.static) continue;
       if (e.T.hostile) {
         hostile++;
         if (d > 96 || (d > 40 && Math.random() < 0.02)) e.remove();
         else if (e.T.burns === undefined && daylight > 0.8 && d > 32 && Math.random() < 0.01) e.remove();
       } else passive++;
     }
-    if (w.dim !== 'overworld') return; // STUB: Nether mobs (ghasts, piglins, blazes) are not implemented.
+    if (w.dim === 'nether' || w.dim === 'end') {
+      // Nether: zombified piglins, ghasts and blazes. End: endermen.
+      // STUB: Nether fortresses (blazes spawn anywhere here), magma cubes, wither skeletons, piglin bartering.
+      if (p.creative || hostile >= (w.dim === 'end' ? 10 : 12) || Math.random() > 0.5) return;
+      const a = Math.random() * Math.PI * 2, r = 16 + Math.random() * 28;
+      const x = Math.floor(p.x + Math.cos(a) * r), z = Math.floor(p.z + Math.sin(a) * r);
+      if (!w.isLoaded(x, z)) return;
+      const k = Math.random();
+      let type = w.dim === 'end' ? 'enderman' : k < 0.6 ? 'zombified_piglin' : k < 0.8 ? 'ghast' : 'blaze';
+      if (type === 'ghast') {
+        const y = 40 + Math.floor(Math.random() * 50);
+        const m = this.spawnMob('ghast', x + 0.5, y, z + 0.5);
+        if (Physics.collides(w, m.aabb())) m.remove();
+        return;
+      }
+      for (let y = w.dim === 'end' ? 70 : 100; y > 20; y--) {
+        if (!Path.standable(w, x, y, z) || FLUID[w.getBlock(x, y, z)] || FLUID[w.getBlock(x, y - 1, z)]) continue;
+        const m = this.spawnMob(type, x + 0.5, y, z + 0.5);
+        if (Physics.collides(w, m.aabb())) m.remove();
+        if (type === 'zombified_piglin') for (let i = 0; i < 2; i++) { const g = this.spawnMob(type, x + 0.5 + Math.random() * 2, y + 0.2, z + 0.5 + Math.random() * 2); if (Physics.collides(w, g.aabb())) g.remove(); }
+        break;
+      }
+      return;
+    }
     const rng = Math.random;
     if (passive < 10 && rng() < 0.25) {
       const a = rng() * Math.PI * 2, r = 20 + rng() * 26;
@@ -6612,7 +7217,7 @@ const Game = {
         const light = Math.max(w.getSky(x, y, z) * daylight, w.getBlockLight(x, y, z));
         if (light >= 7) continue;
         const k = rng();
-        const type = k < 0.35 ? 'zombie' : k < 0.62 ? 'skeleton' : k < 0.82 ? 'creeper' : 'spider';
+        const type = k < 0.33 ? 'zombie' : k < 0.58 ? 'skeleton' : k < 0.78 ? 'creeper' : k < 0.93 ? 'spider' : 'enderman';
         const m = this.spawnMob(type, x + 0.5, y, z + 0.5);
         if (Physics.collides(w, m.aabb())) m.remove();
         break;
@@ -6644,13 +7249,13 @@ const Game = {
       // and game speed stays real-time; game logic runs at a fixed 20 TPS.
       const steps = Math.max(1, Math.ceil(dt / 0.05)), sdt = dt / steps;
       const inp = UI.screen ? {} : Input.state();
-      for (let k = 0; k < steps; k++) {
+      for (let k = 0; k < steps && this.world === w; k++) {
         if (ready) p.update(sdt, inp, w);
         for (const e of this.entities) if (!e.dead) e.update(sdt, w, p);
       }
       this.acc += dt;
       let n = 0;
-      while (this.acc >= TICK && n < 6) { this.acc -= TICK; if (ready) this.tick(); n++; }
+      while (this.acc >= TICK && n < 6) { this.acc -= TICK; if (ready && this.world === w) this.tick(); n++; }
       if (n >= 6) this.acc = 0;
       this.entities = this.entities.filter((e) => !e.dead);
       if (Input.locked()) { Input.updateTarget(); Input.updateMining(dt); Input.updateUse(dt); }
@@ -6698,7 +7303,7 @@ const Game = {
     this.weather = { raining: save && save.weather ? save.weather.raining : false, strength: 0, timer: save && save.weather ? save.weather.timer : 600 + Math.random() * 600 };
     this.worlds = {};
     const dim = save ? save.dim || 'overworld' : 'overworld';
-    for (const d of ['overworld', 'nether']) {
+    for (const d of ['overworld', 'nether', 'end']) {
       if (save && save.worlds && save.worlds[d]) { const w = new World(this.seed, d); Persist.restoreWorld(w, save.worlds[d]); this.worlds[d] = w; }
     }
     if (!this.worlds.overworld) this.worlds.overworld = new World(this.seed, 'overworld');
@@ -6740,6 +7345,7 @@ const Game = {
     $('hud').classList.remove('hidden');
     this.running = true; this.paused = false;
     Renderer.refreshHand = true;
+    if (this.world.dim === 'end' && !this.world.dragonKilled) this.spawnDragon();
     chat(`Welcome to BlockCraft! Seed: ${this.seed}. Press E for inventory, / for commands.`, '#ff8');
     if (this.mode === 'survival') chat('Punch a tree to get started. Monsters come out at night!', '#ccc');
     Input.lock();
@@ -6762,6 +7368,7 @@ const Game = {
   /** Switch the active dimension; `place(world)` returns the arrival [x,y,z]. */
   switchDimension(dim, place) {
     const old = this.world;
+    this.dragon = null;
     for (const c of old.chunks.values()) Renderer.disposeChunk(c);
     old.chunks.clear(); old._lc = null;
     for (const e of this.entities) if (e.remove) e.remove();
@@ -6773,7 +7380,7 @@ const Game = {
     const p = this.player;
     p.x = pos[0]; p.y = pos[1]; p.z = pos[2]; p.vx = p.vy = p.vz = 0; p.fallDist = 0;
     Sound.play('portal');
-    chat(dim === 'nether' ? 'Entering the Nether…' : 'Returning to the Overworld…', '#c8f');
+    if (dim !== 'end') chat(dim === 'nether' ? 'Entering the Nether…' : 'Returning to the Overworld…', '#c8f');
   },
   onPlayerDeath(source) {
     const p = this.player;
@@ -6803,7 +7410,7 @@ const Game = {
   command() {
     this.inCommand = true;
     if (document.pointerLockElement) document.exitPointerLock();
-    const line = window.prompt('Command (e.g. /time set night, /give diamond 5, /gamemode creative, /tp x y z, /summon zombie, /weather rain, /seed):', '/');
+    const line = window.prompt('Command (e.g. /time set night, /give diamond 5, /gamemode creative, /tp x y z, /summon zombie, /weather rain, /seed, /locate, /dimension end):', '/');
     this.inCommand = false;
     if (line) this.runCommand(line.trim().replace(/^\//, ''));
     Input.lock();
@@ -6818,7 +7425,14 @@ const Game = {
       case 'tp': p.x = +a[0]; p.y = +a[1]; p.z = +a[2]; p.vy = 0; break;
       case 'weather': this.weather.raining = a[0] !== 'clear'; this.weather.timer = 600; break;
       case 'seed': chat('Seed: ' + this.seed); break;
-      case 'summon': if (MOB_TYPES[a[0]]) { const [dx, , dz] = Input.lookDir(); this.spawnMob(a[0], p.x + dx * 3, p.y + 0.5, p.z + dz * 3); } else chat('Mobs: ' + Object.keys(MOB_TYPES).join(', '), '#f88'); break;
+      case 'dimension': case 'dim': {
+        const d = a[0];
+        if (d === 'end') { this.player.portalCooldown = 3; Portals.travelEnd(this.player); }
+        else if (d === 'nether' || d === 'overworld') { if (this.world.dim !== d) Portals.travel(this.player); }
+        break;
+      }
+      case 'locate': { const s = Strongholds.nearest(this.seed, p.x, p.z); chat(`Nearest stronghold: ${Math.round(s[0])} ${s[1]} ${Math.round(s[2])}`); break; }
+      case 'summon': if (a[0] === 'ender_dragon') { this.spawnDragon(); break; } else if (MOB_TYPES[a[0]]) { const [dx, , dz] = Input.lookDir(); this.spawnMob(a[0], p.x + dx * 3, p.y + 0.5, p.z + dz * 3); } else chat('Mobs: ' + Object.keys(MOB_TYPES).join(', '), '#f88'); break;
       case 'kill': p.hurt(1000, 'void'); break;
       case 'spawnpoint': p.spawn = [p.x, p.y, p.z]; chat('Spawn point set.'); break;
       case 'save': Persist.save(); break;
